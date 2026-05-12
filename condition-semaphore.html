@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Operating Systems: Condition Variables and Semaphores</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { theme: { extend: { colors: { ink: '#111827' }, boxShadow: { glow: '0 0 45px rgba(20, 184, 166, 0.22)' } } } };
+  </script>
+</head>
+<body class="bg-slate-950 text-white antialiased">
+  <a href="index.html" class="fixed left-4 top-4 z-50 rounded-full border border-white/15 bg-slate-950/80 px-4 py-2 text-sm font-bold text-white backdrop-blur hover:bg-slate-800">← Topics</a>
+
+  <main>
+    <section class="relative overflow-hidden border-b border-white/10">
+      <div class="absolute inset-0 bg-[radial-gradient(circle_at_18%_8%,rgba(45,212,191,0.24),transparent_34%),radial-gradient(circle_at_86%_20%,rgba(14,165,233,0.18),transparent_32%)]"></div>
+      <div class="relative mx-auto max-w-7xl px-5 py-16 sm:px-8 lg:py-24">
+        <div class="grid gap-10 lg:grid-cols-[1fr_1fr] lg:items-center">
+          <div>
+            <p class="mb-4 inline-flex rounded-full border border-teal-300/30 bg-teal-300/10 px-4 py-1 text-sm font-semibold text-teal-100">Concurrency: Condition Variables and Semaphores</p>
+            <h1 class="text-4xl font-black tracking-tight sm:text-6xl">Locks protect data. CVs and semaphores coordinate timing.</h1>
+            <p class="mt-6 max-w-2xl text-lg leading-8 text-slate-300">A thread often needs to wait until something becomes true: a child exits, a buffer becomes non-empty, or a slot becomes free. These primitives let waiting threads sleep instead of spin.</p>
+            <div class="mt-8 flex flex-wrap gap-3">
+              <a href="#cv" class="rounded-full bg-teal-300 px-5 py-3 text-sm font-bold text-slate-950 shadow-glow hover:bg-teal-200">See CV Wait</a>
+              <a href="#producer" class="rounded-full border border-white/15 px-5 py-3 text-sm font-bold text-white hover:bg-white/10">Try Producer/Consumer</a>
+            </div>
+          </div>
+          <div class="rounded-[2rem] border border-white/10 bg-white/10 p-5 shadow-glow backdrop-blur">
+            <div class="rounded-[1.5rem] bg-slate-900 p-6">
+              <h2 class="text-xl font-black">Primitive Cheat Sheet</h2>
+              <div class="mt-5 grid gap-4 sm:grid-cols-3">
+                <div class="rounded-2xl bg-white/10 p-4"><p class="font-black text-amber-200">Lock</p><p class="mt-2 text-sm text-slate-300">Mutual exclusion for shared data.</p></div>
+                <div class="rounded-2xl bg-white/10 p-4"><p class="font-black text-teal-200">CV</p><p class="mt-2 text-sm text-slate-300">Queue for waiting on a condition.</p></div>
+                <div class="rounded-2xl bg-white/10 p-4"><p class="font-black text-sky-200">Semaphore</p><p class="mt-2 text-sm text-slate-300">CV-like wait queue plus integer state.</p></div>
+              </div>
+              <pre class="mt-5 overflow-x-auto rounded-2xl bg-slate-950 p-5 text-sm text-slate-200"><code>while (!condition)
+  pthread_cond_wait(&cv, &mutex);
+
+// wake one waiter
+pthread_cond_signal(&cv);</code></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="cv" class="bg-white text-ink">
+      <div class="mx-auto max-w-7xl px-5 py-16 sm:px-8">
+        <div class="mb-8 max-w-3xl">
+          <p class="text-sm font-black uppercase tracking-[0.24em] text-teal-700">Condition Variables</p>
+          <h2 class="mt-2 text-3xl font-black tracking-tight sm:text-5xl">Wait atomically unlocks, sleeps, then re-locks.</h2>
+          <p class="mt-4 text-lg leading-8 text-slate-600">The mutex prevents missed updates. The <code class="rounded bg-slate-100 px-1 font-mono">while</code> loop prevents a woken thread from assuming the condition is still true.</p>
+        </div>
+        <div class="grid gap-8 lg:grid-cols-[0.95fr_1.05fr]">
+          <div class="rounded-3xl bg-slate-50 p-6 ring-1 ring-slate-200">
+            <div class="flex items-center justify-between gap-3">
+              <h3 class="text-xl font-black">Parent waits for child exit</h3>
+              <button id="cvStep" class="rounded-full bg-teal-600 px-4 py-2 text-sm font-bold text-white hover:bg-teal-500">Next Step</button>
+            </div>
+            <div class="mt-6 grid gap-4 sm:grid-cols-2">
+              <div class="rounded-2xl bg-white p-4 ring-1 ring-slate-200"><p class="font-black text-sky-700">Parent thread</p><div id="parentState" class="mt-3 rounded-xl bg-sky-100 p-4 text-sm font-bold text-sky-950">checks done == false</div></div>
+              <div class="rounded-2xl bg-white p-4 ring-1 ring-slate-200"><p class="font-black text-teal-700">Child thread</p><div id="childState" class="mt-3 rounded-xl bg-teal-100 p-4 text-sm font-bold text-teal-950">running work</div></div>
+            </div>
+            <div class="mt-6 rounded-2xl bg-slate-950 p-5 text-white"><p class="text-sm font-bold text-slate-400">Shared state</p><p id="doneState" class="mt-2 font-mono text-2xl font-black text-teal-300">done = false</p></div>
+          </div>
+          <div class="rounded-3xl bg-slate-950 p-6 text-white shadow-xl">
+            <h3 class="text-xl font-black">Why while, not if?</h3>
+            <div class="mt-5 grid gap-4">
+              <div class="rounded-2xl bg-white/10 p-5"><p class="font-black text-rose-200">If is unsafe</p><p class="mt-2 text-sm leading-6 text-slate-300">After a signal, another thread may consume the condition before the woken thread runs.</p></div>
+              <div class="rounded-2xl bg-white/10 p-5"><p class="font-black text-emerald-200">While is safe</p><p class="mt-2 text-sm leading-6 text-slate-300">Every wakeup rechecks the condition under the mutex before continuing.</p></div>
+            </div>
+            <pre class="mt-5 overflow-x-auto rounded-2xl bg-black/35 p-5 text-sm text-slate-200"><code>pthread_mutex_lock(&m);
+while (!done)
+  pthread_cond_wait(&c, &m);
+pthread_mutex_unlock(&m);</code></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="producer" class="bg-slate-100 text-ink">
+      <div class="mx-auto max-w-7xl px-5 py-16 sm:px-8">
+        <div class="mb-8 max-w-3xl">
+          <p class="text-sm font-black uppercase tracking-[0.24em] text-sky-700">Producer Consumer</p>
+          <h2 class="mt-2 text-3xl font-black tracking-tight sm:text-5xl">Bounded buffers need both mutual exclusion and ordering.</h2>
+        </div>
+        <div class="grid gap-8 lg:grid-cols-[0.9fr_1.1fr]">
+          <div class="rounded-3xl bg-white p-6 ring-1 ring-slate-200">
+            <div class="flex items-center justify-between gap-3">
+              <h3 class="text-xl font-black">Buffer Simulator</h3>
+              <button id="resetBuffer" class="rounded-full bg-slate-950 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800">Reset</button>
+            </div>
+            <div class="mt-5 grid grid-cols-2 gap-3">
+              <button id="produce" class="rounded-2xl bg-teal-500 px-5 py-4 font-black text-white hover:bg-teal-400">Produce</button>
+              <button id="consume" class="rounded-2xl bg-sky-500 px-5 py-4 font-black text-white hover:bg-sky-400">Consume</button>
+            </div>
+            <div id="bufferSlots" class="mt-6 grid grid-cols-4 gap-3"></div>
+            <p id="bufferMessage" class="mt-5 rounded-2xl bg-slate-100 p-4 text-sm font-bold text-slate-700">Buffer starts empty. Consumers wait on full/fill.</p>
+          </div>
+          <div class="rounded-3xl bg-white p-6 shadow-xl ring-1 ring-slate-200">
+            <h3 class="text-xl font-black">Correct CV Structure</h3>
+            <div class="mt-5 grid gap-4 md:grid-cols-2">
+              <div class="rounded-2xl bg-teal-50 p-5 ring-1 ring-teal-100"><p class="font-black text-teal-800">Producer</p><pre class="mt-3 overflow-x-auto text-sm"><code>while (count == MAX)
+  wait(&empty, &mutex);
+put(item);
+signal(&fill);</code></pre></div>
+              <div class="rounded-2xl bg-sky-50 p-5 ring-1 ring-sky-100"><p class="font-black text-sky-800">Consumer</p><pre class="mt-3 overflow-x-auto text-sm"><code>while (count == 0)
+  wait(&fill, &mutex);
+item = get();
+signal(&empty);</code></pre></div>
+            </div>
+            <p class="mt-5 text-sm leading-6 text-slate-600">Use separate condition variables for directed signaling: producers wait for empty slots, consumers wait for filled slots.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="bg-white text-ink">
+      <div class="mx-auto max-w-7xl px-5 py-16 sm:px-8">
+        <div class="grid gap-8 lg:grid-cols-2">
+          <div class="rounded-[2rem] bg-slate-950 p-6 text-white">
+            <p class="text-sm font-black uppercase tracking-[0.24em] text-teal-300">Semaphores</p>
+            <h2 class="mt-2 text-3xl font-black">A semaphore is a counter with a wait queue.</h2>
+            <div class="mt-6 grid gap-4 sm:grid-cols-2">
+              <div class="rounded-2xl bg-white/10 p-5"><p class="font-black text-sky-200">sem_wait</p><p class="mt-2 text-sm text-slate-300">Wait until value &gt; 0, then decrement.</p></div>
+              <div class="rounded-2xl bg-white/10 p-5"><p class="font-black text-teal-200">sem_post</p><p class="mt-2 text-sm text-slate-300">Increment value and wake one waiter.</p></div>
+            </div>
+            <div class="mt-6 rounded-2xl bg-black/35 p-5"><p class="text-sm font-bold text-slate-400">Producer-consumer semaphores</p><p class="mt-2 font-mono text-lg font-black">psem = BUFSIZE, csem = 0</p></div>
+          </div>
+          <div class="rounded-[2rem] bg-slate-50 p-6 ring-1 ring-slate-200">
+            <p class="text-sm font-black uppercase tracking-[0.24em] text-violet-700">Interchangeability</p>
+            <h2 class="mt-2 text-3xl font-black">These primitives can implement each other.</h2>
+            <div class="mt-6 grid gap-4">
+              <div class="rounded-2xl bg-white p-4 ring-1 ring-slate-200"><strong>Mutex from semaphore:</strong> initialize semaphore to 1, wait before critical section, post after.</div>
+              <div class="rounded-2xl bg-white p-4 ring-1 ring-slate-200"><strong>Semaphore from CV + lock:</strong> protect an integer value and sleep while value <= 0.</div>
+              <div class="rounded-2xl bg-white p-4 ring-1 ring-slate-200"><strong>Performance differs:</strong> choose based on contention, wait time, and critical-section frequency.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="bg-slate-100 text-ink">
+      <div class="mx-auto max-w-7xl px-5 py-16 sm:px-8">
+        <div class="mb-8 max-w-3xl">
+          <p class="text-sm font-black uppercase tracking-[0.24em] text-emerald-700">Reader Writer Locks</p>
+          <h2 class="mt-2 text-3xl font-black tracking-tight sm:text-5xl">Many readers can share. Writers need exclusivity.</h2>
+        </div>
+        <div class="grid gap-4 md:grid-cols-4">
+          <div class="rounded-3xl bg-white p-5 ring-1 ring-slate-200"><p class="text-3xl font-black text-sky-700">R</p><h3 class="mt-3 font-black">First reader</h3><p class="mt-2 text-sm text-slate-600">Grabs writer lock to block writers.</p></div>
+          <div class="rounded-3xl bg-white p-5 ring-1 ring-slate-200"><p class="text-3xl font-black text-sky-700">R+</p><h3 class="mt-3 font-black">More readers</h3><p class="mt-2 text-sm text-slate-600">Increment count and read concurrently.</p></div>
+          <div class="rounded-3xl bg-white p-5 ring-1 ring-slate-200"><p class="text-3xl font-black text-emerald-700">R0</p><h3 class="mt-3 font-black">Last reader</h3><p class="mt-2 text-sm text-slate-600">Releases writer lock.</p></div>
+          <div class="rounded-3xl bg-rose-100 p-5 ring-1 ring-rose-200"><p class="text-3xl font-black text-rose-700">W</p><h3 class="mt-3 font-black">Writer</h3><p class="mt-2 text-sm text-slate-700">Waits for exclusive writer lock.</p></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const cvStates = [
+      ['checks done == false', 'running work', 'done = false'],
+      ['pthread_cond_wait: unlocks mutex and sleeps', 'running work', 'done = false'],
+      ['sleeping on CV queue', 'locks mutex, sets done = true', 'done = true'],
+      ['woken by signal, re-locks mutex', 'signals CV and unlocks', 'done = true'],
+      ['while check passes, join returns', 'exited', 'done = true']
+    ];
+    let cvIndex = 0;
+    const cvStep = document.getElementById('cvStep');
+    const parentState = document.getElementById('parentState');
+    const childState = document.getElementById('childState');
+    const doneState = document.getElementById('doneState');
+
+    const bufferSlots = document.getElementById('bufferSlots');
+    const bufferMessage = document.getElementById('bufferMessage');
+    const produce = document.getElementById('produce');
+    const consume = document.getElementById('consume');
+    const resetBuffer = document.getElementById('resetBuffer');
+    let count = 0;
+    const max = 4;
+
+    function renderCv() {
+      const [p, c, d] = cvStates[cvIndex];
+      parentState.textContent = p;
+      childState.textContent = c;
+      doneState.textContent = d;
+    }
+
+    function renderBuffer(message) {
+      bufferSlots.innerHTML = '';
+      for (let i = 0; i < max; i++) {
+        const slot = document.createElement('div');
+        slot.className = `h-24 rounded-2xl p-3 text-center font-black ring-1 ${i < count ? 'bg-teal-300 text-teal-950 ring-teal-400' : 'bg-slate-100 text-slate-400 ring-slate-200'}`;
+        slot.textContent = i < count ? 'item' : 'empty';
+        bufferSlots.appendChild(slot);
+      }
+      bufferMessage.textContent = message || `count = ${count}; psem(empty slots) = ${max - count}; csem(filled slots) = ${count}`;
+    }
+
+    cvStep.addEventListener('click', () => {
+      cvIndex = (cvIndex + 1) % cvStates.length;
+      renderCv();
+    });
+    produce.addEventListener('click', () => {
+      if (count === max) renderBuffer('Buffer full: producer waits on empty/psem.');
+      else { count++; renderBuffer(); }
+    });
+    consume.addEventListener('click', () => {
+      if (count === 0) renderBuffer('Buffer empty: consumer waits on fill/csem.');
+      else { count--; renderBuffer(); }
+    });
+    resetBuffer.addEventListener('click', () => { count = 0; renderBuffer('Buffer reset. Consumers wait on full/fill.'); });
+
+    renderCv();
+    renderBuffer('Buffer starts empty. Consumers wait on full/fill.');
+  </script>
+</body>
+</html>

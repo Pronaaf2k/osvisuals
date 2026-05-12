@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OS Finals Practice</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { theme: { extend: { colors: { ink: '#111827' }, boxShadow: { glow: '0 0 45px rgba(168, 85, 247, 0.22)' } } } };
+  </script>
+</head>
+<body class="bg-slate-950 text-white antialiased">
+  <a href="index.html" class="fixed left-4 top-4 z-50 rounded-full border border-white/15 bg-slate-950/80 px-4 py-2 text-sm font-bold text-white backdrop-blur hover:bg-slate-800">← Topics</a>
+
+  <main class="mx-auto max-w-7xl px-5 py-16 sm:px-8">
+    <section class="mb-10">
+      <p class="mb-4 inline-flex rounded-full border border-purple-300/30 bg-purple-300/10 px-4 py-1 text-sm font-bold text-purple-100">Exam Practice</p>
+      <h1 class="text-4xl font-black tracking-tight sm:text-6xl">CSE 323 Quiz and Final Exam Lab</h1>
+      <p class="mt-5 max-w-3xl text-lg leading-8 text-slate-300">These questions follow the observed final patterns: calculation, translation, synchronization ordering, pseudocode reasoning, and filesystem data-structure reasoning. Attempts are saved in this browser with localStorage.</p>
+    </section>
+
+    <section class="grid gap-6 lg:grid-cols-[20rem_1fr]">
+      <aside class="rounded-[2rem] border border-white/10 bg-white/10 p-5 shadow-glow backdrop-blur lg:sticky lg:top-6 lg:self-start">
+        <h2 class="mb-4 text-xl font-black">Choose Set</h2>
+        <div id="setList" class="grid gap-2"></div>
+        <div class="mt-6 rounded-2xl bg-slate-950/70 p-4">
+          <div class="flex items-center justify-between gap-3"><h3 class="font-black">Saved Attempts</h3><button id="clearHistory" class="text-sm font-bold text-rose-300 hover:text-rose-200">Clear</button></div>
+          <div id="history" class="mt-3 grid gap-2 text-sm text-slate-300"></div>
+        </div>
+      </aside>
+
+      <section class="rounded-[2rem] bg-white p-6 text-ink shadow-xl ring-1 ring-slate-200">
+        <div class="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-5">
+          <div><p id="setType" class="text-sm font-black uppercase tracking-[0.24em] text-purple-700">Topic Quiz</p><h2 id="setTitle" class="mt-1 text-3xl font-black">Segmentation Quiz</h2><p id="setDesc" class="mt-2 max-w-2xl text-slate-600"></p></div>
+          <div class="flex gap-2"><button id="resetAnswers" class="rounded-full bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200">Reset</button><button id="submitExam" class="rounded-full bg-purple-600 px-4 py-2 text-sm font-bold text-white hover:bg-purple-500">Submit</button></div>
+        </div>
+        <div id="scoreBox" class="mt-5 hidden rounded-2xl p-5"></div>
+        <div id="questions" class="mt-6 grid gap-5"></div>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    const sets = [
+      {
+        id: 'segmentation', type: 'Topic Quiz', title: 'Segmentation Quiz', desc: 'Exam-style practice on free lists, base/bounds, segment selector bits, stack frames, and dynamic relocation.',
+        questions: [
+          q('A free list has blocks A=16, B=8, C=64, D=32, E=16. Best-fit allocation of 30 bytes selects which block?', ['A', 'C', 'D', 'E'], 2, 'Best fit chooses the smallest free block that can satisfy the request. D=32 is the smallest block >=30.'),
+          q('After allocating 30 bytes from a 32-byte block with no header overhead, what remains?', ['No remainder', '2-byte free fragment', '30-byte free fragment', '32-byte free block unchanged'], 1, 'The request consumes 30 bytes, leaving 2 bytes. In real allocators such tiny fragments may be unusable, but the exam states no header overhead.'),
+          q('Base=0x4000, bounds=0x0800. VA=0x0100 translates to:', ['0x0100', '0x4100', '0x4800', 'Segmentation fault'], 1, 'Bounds checks VA < 0x0800. 0x0100 is valid, so PA = base + VA = 0x4100.'),
+          q('Base=0x4000, bounds=0x0800. VA=0x0800 is:', ['0x4800', '0x4000', 'Segmentation fault', 'Valid only for stack'], 2, 'With size-style bounds, valid offsets are 0 through bounds-1. 0x0800 equals the bound, so it is illegal.'),
+          q('A 15-bit virtual address uses top 3 bits as segment selector. How many bits remain for offset?', ['3', '8', '12', '15'], 2, '15 total bits - 3 selector bits = 12 offset bits.'),
+          q('Why is dynamic relocation better for memory compaction than static relocation?', ['It needs no hardware', 'The OS can move a process by changing base registers instead of rewriting all embedded addresses', 'It removes all fragmentation', 'It makes stack frames persistent'], 1, 'Static relocation bakes physical addresses into code/data at load time. Dynamic relocation translates at runtime, so changing base metadata can remap the process.'),
+          q('A faulty spin lock does while(*lock); then *lock=true. What race exists?', ['Two threads can pass the while check before either sets the lock', 'The lock can never be released', 'The code disables interrupts forever', 'The stack grows upward'], 0, 'The test and set are separate operations. A preemption between them lets another thread also observe the lock as free.'),
+          q('Returning the address of a local stack variable is unsafe because:', ['The heap always overwrites it', 'The invocation frame is freed/reused after return', 'Global variables are immutable', 'The MMU blocks stack access'], 1, 'A local variable lives in the function invocation frame. After return, that stack memory may be reused by later calls or local variables.')]
+      },
+      {
+        id: 'paging', type: 'Topic Quiz', title: 'Paging Quiz', desc: 'Practice page-size calculations, PTE size, page-table overhead, TLB behavior, and page faults.',
+        questions: [
+          q('With 4 KiB pages, how many offset bits are used?', ['10', '11', '12', '20'], 2, '4 KiB = 4096 bytes = 2^12, so the low 12 bits are the page offset.'),
+          q('32-bit VA and 4 KiB pages gives how many virtual pages?', ['2^12', '2^20', '2^32', '2^44'], 1, 'VPN bits = 32 - 12 = 20, so there are 2^20 virtual pages.'),
+          q('A flat page table has 2^20 entries and each PTE is 4 bytes. Size?', ['1 MiB', '2 MiB', '4 MiB', '8 MiB'], 2, '2^20 * 4 bytes = 2^22 bytes = 4 MiB.'),
+          q('A TLB helps because it:', ['Stores disk blocks', 'Caches recent virtual-to-physical translations', 'Deletes page tables', 'Makes pages contiguous'], 1, 'A TLB avoids repeated page table walks for recently used translations.'),
+          q('A page fault occurs when:', ['The lock is already held', 'The PTE present bit indicates the page is not in memory', 'The file descriptor offset is zero', 'The page size is 4 KiB'], 1, 'During translation, if a valid mapping is not present in RAM, the MMU traps to the OS to handle the fault.'),
+          q('Paging eliminates which segmentation problem?', ['Internal fragmentation', 'Need for hardware support', 'External fragmentation from requiring contiguous physical regions', 'All memory overhead'], 2, 'Paging maps fixed-size virtual pages to arbitrary physical frames, so a process does not need one contiguous physical region.'),
+          q('If physical RAM is 16 GiB and frames are 8 KiB, how many frame-number bits are needed?', ['18', '21', '24', '32'], 1, '16 GiB = 2^34 bytes. 8 KiB = 2^13 bytes. Frames = 2^21, so PFN needs 21 bits.'),
+          q('Why use multi-level page tables?', ['To allocate page-table metadata only for used portions of sparse address spaces', 'To make every page larger', 'To remove TLBs', 'To prevent page faults'], 0, 'Most processes use only part of their virtual space. Multi-level tables avoid allocating all leaf page tables until needed.')]
+      },
+      {
+        id: 'locking', type: 'Topic Quiz', title: 'Locking Quiz', desc: 'Practice critical sections, CAS/test-and-set, ticket locks, deadlock, spin vs queue locks.',
+        questions: [
+          q('The purpose of mutual exclusion is to ensure:', ['All threads run at once', 'Only one thread executes a critical section at a time', 'Every lock is FIFO', 'Interrupts never happen'], 1, 'Mutual exclusion protects shared data by allowing a single thread inside the critical section.'),
+          q('Test-and-set returns:', ['Only the new value', 'The old value while atomically writing the new value', 'A file descriptor', 'The number of waiting threads'], 1, 'The primitive atomically reads the old value and writes the new value, letting the caller know if it acquired the lock.'),
+          q('CAS(ptr, expected, new) writes new when:', ['actual != expected', 'actual == expected', 'the thread is first in FIFO', 'interrupts are disabled'], 1, 'Compare-and-swap is conditional: it updates only if the current value matches the expected value.'),
+          q('Ticket locks improve fairness by:', ['Disabling cache', 'Assigning each arriving thread a monotonically increasing ticket', 'Using no shared variables', 'Making critical sections longer'], 1, 'Fetch-and-add gives every thread a ticket. Threads wait until now_serving equals their ticket.'),
+          q('Two threads acquire locks A,B,C and C,B,A. What can happen?', ['Page fault only', 'Deadlock by circular wait', 'No race is possible', 'The file is unlinked'], 1, 'If one thread holds A and waits for C while the other holds C and waits for A, neither can proceed.'),
+          q('A standard solution to multi-lock deadlock is:', ['Acquire locks in a global fixed order', 'Use smaller integers', 'Use soft links', 'Increase page size'], 0, 'A consistent lock ordering prevents circular wait, one of the necessary conditions for deadlock.'),
+          q('Spin locks are most appropriate when:', ['The wait is expected to be very short', 'The thread may wait for disk I/O', 'The critical section sleeps for seconds', 'Fairness is irrelevant and wait is long'], 0, 'Spinning wastes CPU, so it is acceptable mainly when the lock will be released quickly.'),
+          q('Queue locks reduce spinning by:', ['Putting waiters to sleep and waking them later', 'Removing mutual exclusion', 'Making every operation atomic', 'Using inode tables'], 0, 'Queue locks use OS support like park/unpark so waiting threads do not burn CPU continuously.')]
+      },
+      {
+        id: 'cvsem', type: 'Topic Quiz', title: 'Condition Variables and Semaphores Quiz', desc: 'Practice wait/signal, producer-consumer, semaphore ordering, and reader-writer locks.',
+        questions: [
+          q('pthread_cond_wait(c, m) does what atomically?', ['Locks m twice', 'Unlocks m and sleeps, then re-locks m when waking', 'Deletes the condition variable', 'Signals all waiters'], 1, 'Atomic unlock-and-sleep prevents the missed-signal race between checking the condition and going to sleep.'),
+          q('Why use while rather than if around cond_wait?', ['while is faster', 'The condition must be rechecked after wakeup because another thread may have changed it', 'if cannot compile', 'It avoids all locks'], 1, 'A signal only means something may have changed. The woken thread must recheck the predicate under the mutex.'),
+          q('Producer-consumer with buffer size N: initial empty semaphore should be:', ['0', '1', 'N', 'N-1'], 2, 'empty counts available slots. Initially all N slots are empty.'),
+          q('Producer-consumer with buffer size N: initial full semaphore should be:', ['0', '1', 'N', '2N'], 0, 'full counts produced items. Initially the buffer contains no items.'),
+          q('Producer code should normally do:', ['wait(empty), wait(mutex), put, post(mutex), post(full)', 'wait(mutex), wait(empty), put, post(full)', 'post(full), put, wait(empty)', 'put with no lock'], 0, 'Waiting for capacity before taking mutex avoids holding the mutex while blocked on an unavailable slot.'),
+          q('If producer waits on mutex before empty and buffer is full, what problem can occur?', ['Deadlock: producer holds mutex while waiting, preventing consumer from taking mutex to remove an item', 'A TLB miss', 'External fragmentation', 'The inode count increases'], 0, 'The consumer needs mutex to consume and post empty. If producer holds mutex while blocked on empty, progress can stop.'),
+          q('A semaphore can implement a mutex by initializing it to:', ['0', '1', 'Number of CPUs only', 'File size'], 1, 'A binary semaphore initialized to 1 allows one thread to enter; wait acquires and post releases.'),
+          q('Reader-writer lock idea: multiple readers can enter together, but:', ['Writers also enter together', 'A writer needs exclusive access', 'Readers must use disk', 'There is no shared state'], 1, 'Reader-writer locks allow concurrency among readers but exclude writers from all other readers/writers.')]
+      },
+      {
+        id: 'filesystem', type: 'Topic Quiz', title: 'File System Quiz', desc: 'Practice inodes, directories, file descriptors, indirect pointers, unlink, and links.',
+        questions: [
+          q('A file is best described as:', ['A linear persistent array of bytes', 'Only a directory name', 'A CPU register', 'A page table'], 0, 'Modern Unix-like systems treat files as untyped byte arrays plus metadata.'),
+          q('A directory maps:', ['File descriptors to offsets', 'Filenames to inode numbers', 'Pages to frames', 'Locks to threads'], 1, 'Directory data contains records that map names to inode numbers.'),
+          q('An inode usually stores:', ['The filename only', 'Metadata and block pointers', 'The process stack', 'Only the current offset'], 1, 'Inodes store size, permissions, timestamps, link count, and where the file data blocks are.'),
+          q('The file descriptor is:', ['A per-process integer handle to an open file entry', 'A disk sector number only', 'A hard link', 'A condition variable'], 0, 'open() returns a small integer in the process fd table, which points to open-file state like offset and inode.'),
+          q('dup(fd) generally creates:', ['A new pathname', 'A new descriptor referring to the same open file entry', 'A new inode with copied data', 'A page fault'], 1, 'dup duplicates the descriptor, so both descriptors share the same open-file description and offset.'),
+          q('unlink() does what?', ['Immediately erases all open file data', 'Removes a directory entry and decrements reference count', 'Creates a soft link', 'Formats the disk'], 1, 'A file is freed only after all directory references and open descriptors are gone.'),
+          q('A hard link points to:', ['A pathname string', 'The inode of an existing file', 'A page table entry', 'A socket only'], 1, 'A hard link is another directory entry that references the same inode and increases its link count.'),
+          q('A soft link becomes dangling when:', ['The target pathname no longer resolves', 'The inode has two names', 'The file descriptor offset changes', 'A page is dirty'], 0, 'A symbolic link stores a pathname. If the target is deleted or moved, the symlink may point nowhere.')]
+      },
+      {
+        id: 'written-sync', type: 'Written Code Practice', title: 'Synchronization Code Problems', desc: 'Long final-style problems that require shared variables, initial values, pseudocode, and reasoning. Your written answers are saved locally; compare them with the rubric and model solution after submission.',
+        questions: [
+          w('Chocolate box problem: N children repeatedly take chocolates from a shared box. The box can hold up to N chocolates. A child may eat only if the box is non-empty. If a child finds the box empty, it wakes the mother and waits until she refills the box with N chocolates. The mother refills only when the box is fully empty. Write synchronized pseudocode for child and mother using one mutex and condition variables fullBox and emptyBox. Clearly state shared variables and initial values.', 'Shared state: int count = 0; mutex m; cond fullBox, emptyBox.\n\nChild:\nwhile true:\n  lock(m)\n  while count == 0:\n    signal(emptyBox)\n    wait(fullBox, m)\n  getChocolateFromBox()\n  count--\n  if count == 0:\n    signal(emptyBox)\n  unlock(m)\n  eat()\n\nMother:\nwhile true:\n  lock(m)\n  while count > 0:\n    wait(emptyBox, m)\n  refillChocolateBox(N)\n  count = N\n  broadcast(fullBox)\n  unlock(m)', 'Must protect count with the mutex; child must wait in a while loop when count==0; mother must wait while count>0; refill must set count=N; mother should signal/broadcast children; no busy waiting.', 'This is a condition-variable ordering problem. Identify the predicate each side waits for: children wait for count > 0, mother waits for count == 0.'),
+          w('Server queue problem: A multithreaded server handles client requests. Only one request can be served at a time. At most N requests may exist in the system, including the one being served and all waiting requests. A new request must exit with failure if the system already has N requests. Otherwise it waits if the server is busy, receives service, and exits successfully. Write pseudocode for request threads using mutex and condition variable. Include shared variables and initial values.', 'Shared state: int num_requests = 0; bool server_busy = false; mutex m; cond cv.\n\nrequest_thread():\n  lock(m)\n  if num_requests == N:\n    unlock(m)\n    thr_exit_failure()\n  num_requests++\n  while server_busy:\n    wait(cv, m)\n  server_busy = true\n  unlock(m)\n\n  get_service()\n\n  lock(m)\n  server_busy = false\n  num_requests--\n  if num_requests > 0:\n    signal(cv)\n  unlock(m)\n  thr_exit_success()', 'Must count both waiting and serving threads; must reject when num_requests==N; must use while around wait; exactly one thread calls get_service at a time; must decrement count after service and signal another waiter.', 'Separate admission control from service mutual exclusion. num_requests limits total population; server_busy protects the one-at-a-time service rule.'),
+          w('Bus and passengers problem: A bus arrives periodically with capacity C. Waiting passengers board up to C seats. Passengers arriving after boarding starts must wait for the next bus. Write synchronized pseudocode for bus and passenger threads using mutexes and condition variables. Include shared variables and initial values. Passenger must call board(); bus must call depart().', 'Shared state: int waiting = 0; int seats = 0; bool boarding = false; mutex m; cond busArrived, allAboard.\n\npassenger():\n  lock(m)\n  waiting++\n  while !boarding || seats == 0:\n    wait(busArrived, m)\n  waiting--\n  seats--\n  unlock(m)\n\n  board()\n\n  lock(m)\n  if seats == 0 || waiting == 0:\n    signal(allAboard)\n  unlock(m)\n\nbus():\n  lock(m)\n  boarding = true\n  seats = min(C, waiting)\n  broadcast(busArrived)\n  while seats > 0 && waiting > 0:\n    wait(allAboard, m)\n  boarding = false\n  seats = 0\n  unlock(m)\n  depart()', 'Must prevent late arrivals from joining after boarding window closes; bus boards at most C; bus waits until selected passengers board or no waiting passengers remain; passengers wait in while loop; shared state must be protected.', 'The tricky part is freezing the boarding group. Use a boarding flag and a seats counter so late passengers see no available boarding permission.'),
+          w('Producer-consumer semaphore problem: A bounded buffer has N slots. Producer code uses sem_wait(empty), sem_wait(mutex), put_data(), sem_post(mutex), sem_post(full). State initial values for all semaphores, write matching consumer code using get_data(), and explain what goes wrong if producer swaps sem_wait(mutex) before sem_wait(empty).', 'Initial values: empty=N, full=0, mutex=1.\n\nconsumer():\nwhile true:\n  sem_wait(full)\n  sem_wait(mutex)\n  get_data()\n  sem_post(mutex)\n  sem_post(empty)\n\nIf producer does wait(mutex) before wait(empty), then when the buffer is full a producer can acquire mutex and block on empty. Consumers need mutex to remove an item and post empty, but mutex is held by the blocked producer. This can deadlock.', 'Must give correct initial semaphore values; consumer must wait full before mutex; consumer posts empty after removing; explanation must identify deadlock caused by holding mutex while waiting for empty.', 'Counting semaphores represent resources. Do not hold the buffer mutex while waiting for a resource that another thread must create using that same mutex.'),
+          w('Reader-writer lock using semaphores: Multiple readers may read concurrently, but only one writer may write, and no reader may coexist with a writer. Use only semaphores and integers. Write readLock, readUnlock, writeLock, and writeUnlock. State initial values.', 'Shared state: sem lock = 1; sem writer_can_enter = 1; int readCount = 0.\n\nreadLock():\n  down(lock)\n  readCount++\n  if readCount == 1:\n    down(writer_can_enter)\n  up(lock)\n\nreadUnlock():\n  down(lock)\n  readCount--\n  if readCount == 0:\n    up(writer_can_enter)\n  up(lock)\n\nwriteLock():\n  down(writer_can_enter)\n\nwriteUnlock():\n  up(writer_can_enter)', 'Must protect readCount; first reader blocks writers; last reader releases writers; writer uses writer semaphore exclusively; no unnecessary extra semaphores.', 'The first reader acts like a writer from the writer semaphore viewpoint; the last reader releases that writer exclusion.'),
+          w('Ticket lock problem: Simple spin locks do not guarantee FIFO order. Implement acquire() and release() for a ticket lock using shared global variables next_ticket and now_serving initialized to 0, a thread-local my_ticket, and atomic fetch_and_increment(&x) that returns the old value and increments x.', 'Shared state: int next_ticket = 0; int now_serving = 0; thread-local int my_ticket.\n\nacquire():\n  my_ticket = fetch_and_increment(&next_ticket)\n  while now_serving != my_ticket:\n    ; // spin\n\nrelease():\n  now_serving = now_serving + 1', 'Must use fetch-and-increment to obtain unique ticket; must spin on now_serving; release must advance now_serving exactly once; FIFO comes from increasing ticket order.', 'Think of a deli counter: take a number, wait until the display equals your number, then increment the display when done.'),
+          w('CAS spinlock problem: CAS(&var, oldval, newval) writes newval into var and returns true only if var had oldval; otherwise it returns false and changes nothing. Write acquire() and release() for a simple spinlock where 0 means unlocked and 1 means locked.', 'int lock = 0.\n\nacquire():\n  while CAS(&lock, 0, 1) == false:\n    ; // spin\n\nrelease():\n  lock = 0', 'Must acquire only by changing 0 to 1 atomically; must spin while CAS fails; release stores 0. A good answer may use memory barriers depending on architecture, but the core logic is CAS 0→1.', 'CAS succeeds only when the lock is currently free. The winner is the thread that changes 0 to 1.'),
+          w('Deadlock design problem: Thread 1 acquires mutexA, then mutexB, then mutexC. Thread 2 acquires mutexC, then mutexB, then mutexA. What problem can arise? Give an example interleaving and propose a solution.', 'Problem: deadlock due to circular wait. Example: T1 locks A. T2 locks C. T1 waits for C while holding A. T2 waits for A while holding C, possibly after both interact with B, so neither can proceed.\n\nSolution: impose a global lock ordering, e.g., all threads must acquire A then B then C and release in reverse order. Alternatively use try-lock with backoff, but fixed ordering is the standard solution.', 'Must name deadlock/circular wait; must show an interleaving where each thread holds a lock needed by the other; must propose global lock ordering or equivalent deadlock avoidance.', 'Look for circular wait: each thread owns something the other needs.')]
+      },
+      {
+        id: 'written-systems', type: 'Written Calculation Practice', title: 'Memory and Filesystem Word Problems', desc: 'Long calculation-style final problems for segmentation, paging overhead, and inode capacity. Write your work and compare with the model reasoning.',
+        questions: [
+          w('Segmentation translation: A system has a 15-bit virtual address. Top 3 bits select segment, lower 12 bits are offset. Descriptors: Code ID 001 base 0x3000 size 0x0800 positive; Stack ID 010 base 0x9000 size 0x1000 negative; Heap ID 100 base 0xC000 size 0x0400 positive. Translate VA1=0x1040 and VA2=0x4500 or state segmentation fault.', 'VA1=0x1040. Top 3 bits select segment 001 (Code); offset=0x040. Code size=0x0800, so offset is valid. PA=0x3000+0x040=0x3040.\n\nVA2=0x4500. Top 3 bits select segment 100 (Heap); offset=0x500. Heap size=0x0400, so offset 0x500 is too large. Result: segmentation fault.', 'Must split selector and offset correctly; must check offset against segment size before adding base; must identify illegal access for VA2.', 'Use the lower 12 bits as offset. For a 15-bit VA, the selector is effectively VA >> 12.'),
+          w('Paging overhead: A system has 32-bit virtual addresses, 8 KiB pages, 16 GiB physical RAM, and 500 processes. Each PTE stores the frame number plus 11 flag bits and is rounded to the nearest byte. Hierarchical paging is used. Compute PTE size, PTEs per page, and maximum page-table memory if every process uses its full virtual address space.', 'Page size=8 KiB=2^13, so offset bits=13. Virtual pages per process=2^(32-13)=2^19. Physical RAM=16 GiB=2^34, frames=2^(34-13)=2^21, so PFN bits=21. PTE bits=21+11=32 bits=4 bytes.\n\nPTEs per page=8192/4=2048. Leaf page table pages per process=2^19/2048=2^19/2^11=2^8=256. One outer page can hold 2048 entries, enough to point to 256 leaf tables. Outer table size=1 page.\n\nTotal per process=(256+1)*8 KiB=257*8192=2,105,344 bytes. For 500 processes: 1,052,672,000 bytes, about 1003 MiB.', 'Must compute offset bits, PFN bits, PTE size, entries per table page, number of leaf pages, include outer table, multiply by process count. Accept equivalent byte/MiB values.', 'Break it into powers of two: page offset bits, frame-number bits, PTE bytes, then how many PTEs fit in one page-table page.'),
+          w('Inode maximum file size: Secondary storage is 2 TB with 512-byte blocks. Each inode has 64 bytes for disk pointers. Pointer size is determined by the number of blocks. The inode must include one single indirect pointer and one double indirect pointer; all remaining pointers are direct. Calculate maximum file size in bytes.', 'Storage size=2 TB=2^41 bytes if using TiB-style binary assumption; block size=512=2^9. Number of blocks=2^32, so each block pointer needs 32 bits=4 bytes. Inode pointer space=64 bytes, so 64/4=16 pointer slots. One slot is single indirect and one is double indirect, leaving 14 direct pointers.\n\nPointers per indirect block=512/4=128. Addressable data blocks=14 direct + 128 single-indirect + 128*128 double-indirect = 14 + 128 + 16384 = 16526 blocks.\n\nMax file size=16526*512 = 8,461,312 bytes.', 'Must derive pointer size from disk block count; must reserve one single and one double indirect pointer; must compute pointers per indirect block; must multiply addressable data blocks by block size.', 'First find how many bits are needed to number disk blocks. That determines pointer size, which determines how many pointers fit in the inode and an indirect block.'),
+          w('Free-list allocation: Initial free list is A=15, B=25, C=20 bytes. Allocated block header requires 5 extra bytes not included in request. malloc(12) is called. Which node is selected under first fit? Which under best fit? Show updated free list for best fit.', 'Total required size=12+5=17 bytes. First fit scans A=15 too small, B=25 fits, so first fit selects B. Best fit chooses the smallest block that fits: C=20 is smaller than B=25 and still >=17, so best fit selects C. Updated best-fit free list: A=15 → B=25 → C remainder=3 bytes, assuming splitting is allowed and tiny fragments are kept.', 'Must include header overhead; must distinguish first-fit scan order from best-fit smallest sufficient block; must show C reduced by 17 to 3 bytes.', 'Do not forget header overhead. The allocator needs request + metadata, not just the user payload.'),
+          w('Assembly memory access count: Instructions at 0x2000: mov (%rbx), %eax; 0x2003: add $0x4, %eax; 0x2007: mov %eax, (%rcx). Assume %rbx and %rcx hold valid virtual addresses and every instruction fetch uses the MMU. Count total memory accesses and break down instruction fetches, data loads, and data stores.', 'There are 3 instruction fetches, one for each instruction. The first mov (%rbx), %eax performs one data load from memory. The add immediate uses register and immediate value, so no data load/store besides instruction fetch. The final mov %eax, (%rcx) performs one data store to memory. Total memory accesses=3 instruction fetches + 1 data load + 1 data store = 5.', 'Must count instruction fetch for every instruction; must count load for memory source; must count store for memory destination; must not count register/immediate add as data memory access.', 'Separate instruction fetches from data accesses. Every executed instruction must be fetched.'),
+          w('Pathname and file descriptor reasoning: Explain what happens internally for int fd1=open("/home/nsu/os.txt"); read(fd1, buf, 23); int fd2=open("/home/nsu/os.txt"); int fd3=dup(fd2); Include pathname lookup, inode/device identity, offsets for fd1/fd2/fd3, and why dup differs from a separate open.', 'open("/home/nsu/os.txt") starts at root inode, looks up home, then nsu, then os.txt in directory data, obtaining the file inode/device. fd1 is a per-process descriptor pointing to an open file entry with offset initially 0. read(fd1, buf, 23) advances fd1 open-file offset to 23.\n\nA second open of the same path creates a separate open file entry for the same inode/device, so fd2 has independent offset 0. dup(fd2) creates fd3 pointing to the same open file entry as fd2, so fd2 and fd3 share one offset. Reads through fd2 affect fd3 offset and vice versa, but fd1 remains independent.', 'Must mention directory traversal to inode, fd table, separate open entries for separate open calls, offset advancement after read, and shared offset for dup.', 'Separate persistent identity from process view: same inode can have multiple open file entries; dup shares an open file entry.')]
+      },
+      writtenFinalSet('written-final-a', 'Written Final Set A'),
+      writtenFinalSet('written-final-b', 'Written Final Set B'),
+      writtenFinalSet('written-final-c', 'Written Final Set C'),
+      finalSet('final-a', 'Quick Check Set A', [0,1,2,3,4]),
+      finalSet('final-b', 'Quick Check Set B', [1,3,4,0,2]),
+      finalSet('final-c', 'Quick Check Set C', [4,2,0,1,3])
+    ];
+
+    function q(prompt, choices, answer, explanation, hint) {
+      return { kind: 'mcq', prompt, choices, answer, explanation, hint: hint || makeHint(prompt) };
+    }
+
+    function w(prompt, model, rubric, hint) {
+      return { kind: 'written', prompt, model, rubric, hint: hint || makeHint(prompt) };
+    }
+
+    function makeHint(prompt) {
+      const text = prompt.toLowerCase();
+      if (text.includes('best-fit')) return 'Find every block large enough, then choose the smallest one among them.';
+      if (text.includes('base') || text.includes('bounds') || text.includes('segmentation') || text.includes('offset')) return 'First check whether the offset is inside the segment limit. Only then add the base address.';
+      if (text.includes('bits') || text.includes('pte') || text.includes('page') || text.includes('frame')) return 'Convert sizes to powers of two, then subtract offset bits from address bits.';
+      if (text.includes('tlb')) return 'Think of the TLB as a cache for translations, not as the main page table.';
+      if (text.includes('fault')) return 'Look for the present bit or whether the referenced page is currently in RAM.';
+      if (text.includes('test-and-set') || text.includes('cas') || text.includes('compare')) return 'Focus on what the hardware operation does atomically: read, compare or write without interruption.';
+      if (text.includes('ticket')) return 'Ticket locks behave like a queue: take a number, wait until that number is served.';
+      if (text.includes('deadlock') || text.includes('locks a,b,c')) return 'Check whether two threads can each hold one resource while waiting for the other.';
+      if (text.includes('cond') || text.includes('wait') || text.includes('signal') || text.includes('while')) return 'Ask what condition the thread is waiting for, and remember it must be rechecked after wakeup.';
+      if (text.includes('producer') || text.includes('consumer') || text.includes('empty') || text.includes('full')) return 'empty counts free slots; full counts filled slots; mutex protects buffer manipulation.';
+      if (text.includes('semaphore')) return 'Track the semaphore integer: wait decrements after availability, post increments and may wake one waiter.';
+      if (text.includes('inode') || text.includes('directory') || text.includes('descriptor') || text.includes('unlink') || text.includes('link')) return 'Separate the three identities: pathname for humans, inode on disk, file descriptor inside a process.';
+      return 'Identify the OS mechanism first, then apply the invariant it must preserve.';
+    }
+
+    function finalSet(id, title, order) {
+      const pools = [
+        [
+          q('Final style: A 14-bit VA uses top 2 bits for segment. Offset bits?', ['2', '10', '12', '14'], 2, '14 - 2 = 12 offset bits.'),
+          q('Final style: Best-fit on blocks 15,25,20 with request 12 plus 5-byte header selects:', ['15', '20', '25', 'None'], 1, 'Total needed is 17. The smallest block >=17 is 20.'),
+          q('Final style: Base=0x3000, size=0x0800, offset=0x040. PA?', ['0x3040', '0x0800', 'Segmentation fault', '0x4040'], 0, 'Offset 0x040 is within 0x0800, so PA=0x3000+0x040=0x3040.')
+        ],
+        [
+          q('Final style: 32-bit VA, 8 KiB pages. VPN bits?', ['13', '19', '21', '32'], 1, '8 KiB = 2^13 offset bits. VPN bits = 32 - 13 = 19.'),
+          q('Final style: 16 GiB RAM, 8 KiB frames. PFN bits?', ['13', '19', '21', '34'], 2, '16 GiB=2^34 bytes and 8 KiB=2^13, so frames=2^21.'),
+          q('Final style: PTE needs PFN bits plus 11 flag bits. If PFN=21, rounded PTE size is:', ['3 bytes', '4 bytes', '5 bytes', '32 bytes'], 1, '21+11=32 bits = 4 bytes.')
+        ],
+        [
+          q('Final style: Inode has 64 bytes for pointers and pointer size is 4 bytes. Total pointers?', ['8', '12', '16', '64'], 2, '64/4 = 16 pointer slots.'),
+          q('Final style: If one single and one double indirect pointer are required, direct pointers available:', ['12', '14', '15', '16'], 1, '16 total pointer slots - 2 indirect pointer slots = 14 direct pointers.'),
+          q('Final style: Advantage of indirect pointers:', ['They make small files impossible', 'They allow much larger files without huge inodes', 'They remove metadata', 'They avoid all disk reads'], 1, 'Indirect blocks let the inode reference many data blocks while keeping the inode fixed-size.')
+        ],
+        [
+          q('Final style: Producer-consumer semaphore initial values for N-slot buffer:', ['empty=0 full=N mutex=1', 'empty=N full=0 mutex=1', 'empty=1 full=1 mutex=0', 'empty=N full=N mutex=1'], 1, 'empty counts free slots, full counts filled slots, mutex starts unlocked.'),
+          q('Final style: Consumer order should be:', ['wait(full), wait(mutex), get, post(mutex), post(empty)', 'wait(empty), get, post(full)', 'wait(mutex), wait(empty), get', 'post(empty), wait(full), get'], 0, 'Consumer first waits for an available item, then locks the buffer, consumes, unlocks, and posts an empty slot.'),
+          q('Final style: Bus/passenger problem needs CVs because:', ['Passengers must wait for an ordering event: bus arrival and boarding permission', 'Files need inodes', 'Pages need offsets', 'CAS returns old value'], 0, 'This is an ordering/sleeping problem, not just mutual exclusion. Passengers wait until bus state allows boarding.')
+        ],
+        [
+          q('Final style: Opening /a/b.txt first starts from:', ['Current file offset', 'Root directory inode', 'The data bitmap', 'The TLB'], 1, 'Absolute path lookup starts at the well-known root directory inode.'),
+          q('Final style: Two separate open("file.txt") calls usually have:', ['Same descriptor and same offset', 'Different descriptors and independent open-file offsets', 'No inode', 'Only one can read'], 1, 'Separate open calls create separate open file entries, each with its own offset, even if they reference the same inode.'),
+          q('Final style: File data is freed after unlink when:', ['The name is removed, link count is zero, and no open descriptor still references it', 'Any process calls read', 'The path is absolute', 'A soft link exists'], 0, 'unlink only removes a name. Storage is reclaimed when no references remain.')
+        ]
+      ];
+      const questions = [];
+      order.forEach(index => questions.push(...pools[index]));
+      return { id, type: 'Final-Style Mixed Set', title, desc: 'Mixed exam-style set covering memory virtualization, paging, synchronization, and filesystem reasoning.', questions };
+    }
+
+    function writtenFinalSet(id, title) {
+      const sync = [
+        w('Producer-consumer semaphore problem: A bounded buffer has N slots. Producer code uses sem_wait(empty), sem_wait(mutex), put_data(), sem_post(mutex), sem_post(full). State initial values for all semaphores, write matching consumer code using get_data(), and explain what goes wrong if producer swaps sem_wait(mutex) before sem_wait(empty).', 'Initial values: empty=N, full=0, mutex=1.\n\nconsumer():\nwhile true:\n  sem_wait(full)\n  sem_wait(mutex)\n  get_data()\n  sem_post(mutex)\n  sem_post(empty)\n\nIf producer does wait(mutex) before wait(empty), then when the buffer is full a producer can acquire mutex and block on empty. Consumers need mutex to remove an item and post empty, but mutex is held by the blocked producer. This can deadlock.', 'Correct semaphore values; consumer waits full before mutex; posts empty after consume; deadlock explanation mentions holding mutex while waiting for empty.', 'empty counts slots, full counts items, mutex protects buffer access.'),
+        w('Bus and passengers problem: A bus arrives periodically with capacity C. Waiting passengers board up to C seats. Passengers arriving after boarding starts must wait for the next bus. Write synchronized pseudocode for bus and passenger threads using mutexes and condition variables. Include shared variables and initial values. Passenger must call board(); bus must call depart().', 'Shared state: int waiting = 0; int seats = 0; bool boarding = false; mutex m; cond busArrived, allAboard.\n\npassenger():\n  lock(m)\n  waiting++\n  while !boarding || seats == 0:\n    wait(busArrived, m)\n  waiting--\n  seats--\n  unlock(m)\n  board()\n  lock(m)\n  if seats == 0 || waiting == 0:\n    signal(allAboard)\n  unlock(m)\n\nbus():\n  lock(m)\n  boarding = true\n  seats = min(C, waiting)\n  broadcast(busArrived)\n  while seats > 0 && waiting > 0:\n    wait(allAboard, m)\n  boarding = false\n  seats = 0\n  unlock(m)\n  depart()', 'Prevents late arrivals from boarding current bus; boards at most C; uses while; bus waits correctly; shared variables protected.', 'Freeze boarding permission with seats plus a boarding flag.'),
+        w('Reader-writer lock using semaphores: Multiple readers may read concurrently, but only one writer may write, and no reader may coexist with a writer. Use only semaphores and integers. Write readLock, readUnlock, writeLock, and writeUnlock. State initial values.', 'Shared state: sem lock = 1; sem writer_can_enter = 1; int readCount = 0.\n\nreadLock():\n  down(lock)\n  readCount++\n  if readCount == 1:\n    down(writer_can_enter)\n  up(lock)\n\nreadUnlock():\n  down(lock)\n  readCount--\n  if readCount == 0:\n    up(writer_can_enter)\n  up(lock)\n\nwriteLock():\n  down(writer_can_enter)\n\nwriteUnlock():\n  up(writer_can_enter)', 'Protects readCount; first reader blocks writers; last reader releases writers; writer uses exclusive semaphore.', 'First reader locks writers out; last reader lets writers in.')
+      ];
+      const systems = [
+        w('Segmentation translation: A system has a 15-bit virtual address. Top 3 bits select segment, lower 12 bits are offset. Descriptors: Code ID 001 base 0x3000 size 0x0800 positive; Stack ID 010 base 0x9000 size 0x1000 negative; Heap ID 100 base 0xC000 size 0x0400 positive. Translate VA1=0x1040 and VA2=0x4500 or state segmentation fault.', 'VA1=0x1040 selects Code (001), offset=0x040, valid because 0x040 < 0x0800. PA=0x3000+0x040=0x3040.\n\nVA2=0x4500 selects Heap (100), offset=0x500, invalid because 0x500 >= 0x0400. Segmentation fault.', 'Splits selector/offset correctly; checks bounds before base addition; identifies illegal access.', 'Selector is VA >> 12; offset is low 12 bits.'),
+        w('Paging overhead: A system has 32-bit virtual addresses, 8 KiB pages, 16 GiB physical RAM, and 500 processes. Each PTE stores the frame number plus 11 flag bits and is rounded to the nearest byte. Hierarchical paging is used. Compute PTE size, PTEs per page, and maximum page-table memory if every process uses its full virtual address space.', '8 KiB=2^13 offset bits. Virtual pages=2^(32-13)=2^19. RAM=16 GiB=2^34; frames=2^(34-13)=2^21, so PFN bits=21. PTE bits=21+11=32 bits=4 bytes. PTEs per page=8192/4=2048. Leaf pages per process=2^19/2048=256. Add one outer page: 257 pages/process. Memory per process=257*8192=2,105,344 bytes. For 500 processes=1,052,672,000 bytes.', 'Computes offset bits, PFN bits, PTE size, entries per table page, page-table pages, and total across processes.', 'Use powers of two; include both outer and inner tables.'),
+        w('Inode maximum file size: Secondary storage is 2 TB with 512-byte blocks. Each inode has 64 bytes for disk pointers. Pointer size is determined by the number of blocks. The inode must include one single indirect pointer and one double indirect pointer; all remaining pointers are direct. Calculate maximum file size in bytes.', 'Assume 2 TB as 2^41 bytes. Blocks=2^41/2^9=2^32, so pointers need 32 bits=4 bytes. Inode pointer slots=64/4=16. Direct pointers=14 after reserving one single and one double indirect pointer. Pointers per indirect block=512/4=128. Data blocks=14+128+128^2=16526. Max file size=16526*512=8,461,312 bytes.', 'Derives pointer size; counts direct/single/double indirect capacity; multiplies by block size.', 'Pointer size depends on number of addressable disk blocks.'),
+        w('Pathname and file descriptor reasoning: Explain what happens internally for int fd1=open("/home/nsu/os.txt"); read(fd1, buf, 23); int fd2=open("/home/nsu/os.txt"); int fd3=dup(fd2); Include pathname lookup, inode/device identity, offsets for fd1/fd2/fd3, and why dup differs from a separate open.', 'open starts at root inode, resolves home, nsu, then os.txt to get inode/device. fd1 points to an open file entry with offset 0; read(fd1, 23) advances fd1 offset to 23. A second open creates a separate open file entry for the same inode/device, so fd2 offset is independent and starts at 0. dup(fd2) creates fd3 pointing to the same open file entry as fd2, so fd2 and fd3 share offset.', 'Mentions directory traversal, inode/device, fd table, independent offsets for separate opens, shared offset for dup.', 'Same file identity does not imply same open-file offset.')
+      ];
+      const questions = id.endsWith('a') ? [systems[0], systems[1], systems[2], sync[0], sync[1]] : id.endsWith('b') ? [systems[3], systems[1], sync[0], sync[2], systems[0]] : [systems[2], systems[3], sync[1], sync[2], systems[1]];
+      return { id, type: 'Written Final Exam', title, desc: 'Five long-answer problems modeled after the final format. Write your answer first, then expand the rubric and model solution.', questions };
+    }
+
+    const setList = document.getElementById('setList');
+    const questionsEl = document.getElementById('questions');
+    const setType = document.getElementById('setType');
+    const setTitle = document.getElementById('setTitle');
+    const setDesc = document.getElementById('setDesc');
+    const scoreBox = document.getElementById('scoreBox');
+    const historyEl = document.getElementById('history');
+    let activeSet = sets.find(s => s.id === 'written-sync') || sets[0];
+    let submitted = false;
+
+    function renderSetList() {
+      setList.innerHTML = '';
+      sets.forEach(set => {
+        const btn = document.createElement('button');
+        btn.className = `rounded-2xl px-4 py-3 text-left text-sm font-bold ${set.id === activeSet.id ? 'bg-purple-300 text-slate-950' : 'bg-white/10 text-slate-200 hover:bg-white/15'}`;
+        btn.textContent = `${set.title} (${set.questions.length})`;
+        btn.addEventListener('click', () => { activeSet = set; submitted = false; render(); });
+        setList.appendChild(btn);
+      });
+    }
+
+    function renderQuestions() {
+      questionsEl.innerHTML = '';
+      activeSet.questions.forEach((question, qi) => {
+        const card = document.createElement('article');
+        card.className = 'rounded-3xl bg-slate-50 p-5 ring-1 ring-slate-200';
+        if (question.kind === 'written') {
+          const draftKey = `osDraft:${activeSet.id}:${qi}`;
+          const saved = localStorage.getItem(draftKey) || '';
+          card.innerHTML = `<details open class="group"><summary class="cursor-pointer list-none"><div class="flex items-start justify-between gap-4"><div><p class="text-sm font-black uppercase tracking-[0.2em] text-purple-700">Problem ${qi + 1}</p><h3 class="mt-2 text-xl font-black leading-snug">${question.prompt}</h3></div><span class="rounded-full bg-slate-200 px-3 py-1 text-sm font-bold text-slate-700 group-open:bg-purple-100 group-open:text-purple-800">Expand</span></div></summary><div class="mt-5"><label class="text-sm font-black uppercase tracking-widest text-slate-500">Your answer</label><textarea data-draft-key="${draftKey}" class="answerBox mt-2 min-h-56 w-full rounded-2xl border border-slate-300 bg-white p-4 font-mono text-sm leading-6 outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-100" placeholder="Write variables, initial values, pseudocode, and explanation here...">${saved}</textarea><div class="mt-4 grid gap-3 md:grid-cols-3"><details class="rounded-2xl bg-purple-50 p-4"><summary class="cursor-pointer font-black text-purple-900">Hint</summary><p class="mt-3 text-sm font-semibold leading-6 text-purple-900">${question.hint}</p></details><details class="rounded-2xl bg-amber-50 p-4"><summary class="cursor-pointer font-black text-amber-900">Rubric</summary><p class="mt-3 whitespace-pre-line text-sm leading-6 text-amber-950">${question.rubric}</p></details><details class="rounded-2xl bg-emerald-50 p-4"><summary class="cursor-pointer font-black text-emerald-900">Model Answer</summary><pre class="mt-3 whitespace-pre-wrap rounded-xl bg-white p-3 text-sm leading-6 text-emerald-950 ring-1 ring-emerald-100">${question.model}</pre></details></div></div></details>`;
+        } else {
+          card.innerHTML = `<h3 class="font-black">${qi + 1}. ${question.prompt}</h3><div class="mt-4 grid gap-2">${question.choices.map((choice, ci) => `<label class="flex cursor-pointer gap-3 rounded-2xl bg-white p-3 ring-1 ring-slate-200 hover:bg-slate-100"><input type="radio" name="q${qi}" value="${ci}" class="mt-1 accent-purple-600"><span>${choice}</span></label>`).join('')}</div><button type="button" class="hintBtn mt-4 rounded-full bg-purple-100 px-4 py-2 text-sm font-bold text-purple-800 hover:bg-purple-200">Show hint</button><div class="hintBox mt-3 hidden rounded-2xl bg-purple-50 p-4 text-sm font-semibold text-purple-900">Hint: ${question.hint}</div><div class="explain mt-4 hidden rounded-2xl p-4 text-sm"></div>`;
+        }
+        questionsEl.appendChild(card);
+      });
+      questionsEl.querySelectorAll('.answerBox').forEach(box => {
+        box.addEventListener('input', () => localStorage.setItem(box.dataset.draftKey, box.value));
+      });
+      questionsEl.querySelectorAll('.hintBtn').forEach(button => {
+        button.addEventListener('click', () => {
+          const hint = button.nextElementSibling;
+          hint.classList.toggle('hidden');
+          button.textContent = hint.classList.contains('hidden') ? 'Show hint' : 'Hide hint';
+        });
+      });
+    }
+
+    function submit() {
+      if (activeSet.questions.every(question => question.kind === 'written')) {
+        const answered = [...questionsEl.querySelectorAll('.answerBox')].filter(box => box.value.trim().length > 0).length;
+        scoreBox.className = 'mt-5 rounded-2xl bg-purple-100 p-5 text-purple-900';
+        scoreBox.innerHTML = `<strong>Saved ${answered}/${activeSet.questions.length} written answers.</strong><br>Now expand each rubric and model answer to compare your solution. Written practice is not auto-graded because final answers depend on pseudocode quality and explanation.`;
+        saveWrittenAttempt(answered);
+        renderHistory();
+        return;
+      }
+      let correct = 0;
+      activeSet.questions.forEach((question, qi) => {
+        if (question.kind !== 'mcq') return;
+        const chosen = Number(document.querySelector(`input[name="q${qi}"]:checked`)?.value ?? -1);
+        const card = questionsEl.children[qi];
+        const explain = card.querySelector('.explain');
+        const ok = chosen === question.answer;
+        if (ok) correct++;
+        explain.className = `explain mt-4 rounded-2xl p-4 text-sm ${ok ? 'bg-emerald-100 text-emerald-900' : 'bg-rose-100 text-rose-900'}`;
+        explain.innerHTML = `<strong>${ok ? 'Correct.' : 'Not quite.'}</strong> Answer: ${question.choices[question.answer]}<br>${question.explanation}`;
+      });
+      const totalMcq = activeSet.questions.filter(question => question.kind === 'mcq').length;
+      const percent = Math.round((correct / totalMcq) * 100);
+      scoreBox.className = `mt-5 rounded-2xl p-5 ${percent >= 70 ? 'bg-emerald-100 text-emerald-900' : 'bg-amber-100 text-amber-900'}`;
+      scoreBox.innerHTML = `<strong>Score: ${correct}/${totalMcq} (${percent}%)</strong><br>Review every explanation before moving to the next set.`;
+      saveAttempt(correct, percent);
+      renderHistory();
+      submitted = true;
+    }
+
+    function saveAttempt(correct, percent) {
+      const attempts = JSON.parse(localStorage.getItem('osExamAttempts') || '[]');
+      attempts.unshift({ set: activeSet.title, correct, total: activeSet.questions.length, percent, time: new Date().toLocaleString() });
+      localStorage.setItem('osExamAttempts', JSON.stringify(attempts.slice(0, 20)));
+    }
+
+    function saveWrittenAttempt(answered) {
+      const attempts = JSON.parse(localStorage.getItem('osExamAttempts') || '[]');
+      attempts.unshift({ set: activeSet.title, correct: answered, total: activeSet.questions.length, percent: 'written', time: new Date().toLocaleString() });
+      localStorage.setItem('osExamAttempts', JSON.stringify(attempts.slice(0, 20)));
+    }
+
+    function renderHistory() {
+      const attempts = JSON.parse(localStorage.getItem('osExamAttempts') || '[]');
+      historyEl.innerHTML = attempts.length ? attempts.map(a => `<div class="rounded-xl bg-white/10 p-3"><strong>${a.percent === 'written' ? 'Written' : `${a.percent}%`}</strong> ${a.set}<br><span class="text-xs text-slate-400">${a.correct}/${a.total} answered - ${a.time}</span></div>`).join('') : '<p class="text-slate-400">No attempts yet.</p>';
+    }
+
+    function render() {
+      setType.textContent = activeSet.type;
+      setTitle.textContent = activeSet.title;
+      setDesc.textContent = activeSet.desc;
+      scoreBox.className = 'mt-5 hidden rounded-2xl p-5';
+      scoreBox.innerHTML = '';
+      renderSetList();
+      renderQuestions();
+    }
+
+    document.getElementById('submitExam').addEventListener('click', submit);
+    document.getElementById('resetAnswers').addEventListener('click', () => { submitted = false; render(); });
+    document.getElementById('clearHistory').addEventListener('click', () => { localStorage.removeItem('osExamAttempts'); renderHistory(); });
+    render();
+    renderHistory();
+  </script>
+</body>
+</html>

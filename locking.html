@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Operating Systems: Locking Visualized</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: { ink: '#111827', paper: '#f8fafc' },
+          boxShadow: { glow: '0 0 45px rgba(245, 158, 11, 0.24)' }
+        }
+      }
+    };
+  </script>
+</head>
+<body class="bg-slate-950 text-white antialiased">
+  <a href="index.html" class="fixed left-4 top-4 z-50 rounded-full border border-white/15 bg-slate-950/80 px-4 py-2 text-sm font-bold text-white backdrop-blur hover:bg-slate-800">← Topics</a>
+
+  <main>
+    <section class="relative overflow-hidden border-b border-white/10">
+      <div class="absolute inset-0 bg-[radial-gradient(circle_at_18%_8%,rgba(251,191,36,0.24),transparent_34%),radial-gradient(circle_at_86%_20%,rgba(239,68,68,0.18),transparent_32%)]"></div>
+      <div class="relative mx-auto max-w-7xl px-5 py-16 sm:px-8 lg:py-24">
+        <div class="grid gap-10 lg:grid-cols-[1fr_1fr] lg:items-center">
+          <div>
+            <p class="mb-4 inline-flex rounded-full border border-amber-300/30 bg-amber-300/10 px-4 py-1 text-sm font-semibold text-amber-100">Concurrency: Locking</p>
+            <h1 class="text-4xl font-black tracking-tight sm:text-6xl">Locks make shared data feel atomic.</h1>
+            <p class="mt-6 max-w-2xl text-lg leading-8 text-slate-300">Concurrent threads can interleave inside shared code. A lock protects the critical section so only one thread updates shared state at a time.</p>
+            <div class="mt-8 flex flex-wrap gap-3">
+              <a href="#race" class="rounded-full bg-amber-300 px-5 py-3 text-sm font-bold text-slate-950 shadow-glow hover:bg-amber-200">See Race Condition</a>
+              <a href="#locks" class="rounded-full border border-white/15 px-5 py-3 text-sm font-bold text-white hover:bg-white/10">Compare Locks</a>
+            </div>
+          </div>
+          <div class="rounded-[2rem] border border-white/10 bg-white/10 p-5 shadow-glow backdrop-blur">
+            <div class="rounded-[1.5rem] bg-slate-900 p-6">
+              <h2 class="text-xl font-black">The contract</h2>
+              <div class="mt-5 grid gap-4 sm:grid-cols-3">
+                <div class="rounded-2xl bg-white/10 p-4"><p class="text-sm font-black text-amber-200">Mutual exclusion</p><p class="mt-2 text-sm text-slate-300">One thread inside critical section.</p></div>
+                <div class="rounded-2xl bg-white/10 p-4"><p class="text-sm font-black text-emerald-200">Fairness</p><p class="mt-2 text-sm text-slate-300">Waiting threads eventually enter.</p></div>
+                <div class="rounded-2xl bg-white/10 p-4"><p class="text-sm font-black text-blue-200">Performance</p><p class="mt-2 text-sm text-slate-300">Acquire and release stay cheap.</p></div>
+              </div>
+              <pre class="mt-5 overflow-x-auto rounded-2xl bg-slate-950 p-5 text-sm text-slate-200"><code>lock(&mutex);
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="race" class="bg-white text-ink">
+      <div class="mx-auto max-w-7xl px-5 py-16 sm:px-8">
+        <div class="mb-8 max-w-3xl">
+          <p class="text-sm font-black uppercase tracking-[0.24em] text-rose-700">Race Conditions</p>
+          <h2 class="mt-2 text-3xl font-black tracking-tight sm:text-5xl">The bug is the interleaving.</h2>
+          <p class="mt-4 text-lg leading-8 text-slate-600">Two threads both run <code class="rounded bg-slate-100 px-1 font-mono">cnt = cnt + 1</code>. If each reads the old value before either writes, one increment disappears.</p>
+        </div>
+        <div class="grid gap-8 lg:grid-cols-[0.9fr_1.1fr]">
+          <div class="rounded-3xl bg-slate-50 p-6 ring-1 ring-slate-200">
+            <div class="flex items-center justify-between gap-4">
+              <h3 class="text-xl font-black">Race Simulator</h3>
+              <button id="raceToggle" class="rounded-full bg-slate-950 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800">Enable Lock</button>
+            </div>
+            <p id="raceMode" class="mt-4 rounded-2xl bg-rose-100 p-4 text-sm font-bold text-rose-800">Unlocked: both threads can enter the critical section together.</p>
+            <div class="mt-6 grid gap-4 sm:grid-cols-2">
+              <div class="rounded-2xl bg-white p-4 ring-1 ring-slate-200"><p class="text-sm font-black text-blue-700">Thread A</p><div id="threadA" class="mt-3 h-24 rounded-xl bg-blue-100 p-3 text-sm font-bold text-blue-900">ready</div></div>
+              <div class="rounded-2xl bg-white p-4 ring-1 ring-slate-200"><p class="text-sm font-black text-fuchsia-700">Thread B</p><div id="threadB" class="mt-3 h-24 rounded-xl bg-fuchsia-100 p-3 text-sm font-bold text-fuchsia-900">ready</div></div>
+            </div>
+            <button id="runRace" class="mt-6 w-full rounded-2xl bg-amber-300 px-5 py-4 font-black text-slate-950 hover:bg-amber-200">Run one interleaving</button>
+          </div>
+          <div class="rounded-3xl bg-slate-950 p-6 text-white shadow-xl">
+            <h3 class="text-xl font-black">Shared Counter Timeline</h3>
+            <div class="mt-5 rounded-2xl bg-white/10 p-5">
+              <p class="text-sm font-bold text-slate-400">Final counter</p>
+              <p id="counterOut" class="mt-2 text-6xl font-black text-amber-300">1</p>
+              <p id="counterExplain" class="mt-3 text-sm leading-6 text-slate-300">Lost update: both threads read 0, both write 1.</p>
+            </div>
+            <div id="timeline" class="mt-5 grid gap-3"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="locks" class="bg-slate-100 text-ink">
+      <div class="mx-auto max-w-7xl px-5 py-16 sm:px-8">
+        <div class="mb-8 max-w-3xl">
+          <p class="text-sm font-black uppercase tracking-[0.24em] text-amber-700">Implementation Path</p>
+          <h2 class="mt-2 text-3xl font-black tracking-tight sm:text-5xl">From simple locks to fair locks.</h2>
+        </div>
+        <div class="grid gap-5 lg:grid-cols-4">
+          <article class="rounded-3xl bg-white p-6 ring-1 ring-slate-200"><p class="text-sm font-black uppercase tracking-widest text-slate-500">Interrupt locks</p><h3 class="mt-2 text-xl font-black">Disable interrupts</h3><p class="mt-3 text-sm leading-6 text-slate-600">Simple and useful on uniprocessors or MCUs, but not enough for multicore systems.</p></article>
+          <article class="rounded-3xl bg-white p-6 ring-1 ring-slate-200"><p class="text-sm font-black uppercase tracking-widest text-rose-700">Faulty spin lock</p><h3 class="mt-2 text-xl font-black">Check then set</h3><p class="mt-3 text-sm leading-6 text-slate-600">A thread can be preempted after the check, letting another thread also acquire.</p></article>
+          <article class="rounded-3xl bg-white p-6 ring-1 ring-slate-200"><p class="text-sm font-black uppercase tracking-widest text-blue-700">Atomic spin lock</p><h3 class="mt-2 text-xl font-black">Test-and-set</h3><p class="mt-3 text-sm leading-6 text-slate-600">Hardware atomically reads old value and writes held value in one indivisible step.</p></article>
+          <article class="rounded-3xl bg-white p-6 ring-1 ring-slate-200"><p class="text-sm font-black uppercase tracking-widest text-emerald-700">Queue lock</p><h3 class="mt-2 text-xl font-black">Park and unpark</h3><p class="mt-3 text-sm leading-6 text-slate-600">Instead of wasting CPU by spinning, blocked threads sleep in a queue.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="bg-white text-ink">
+      <div class="mx-auto max-w-7xl px-5 py-16 sm:px-8">
+        <div class="grid gap-8 lg:grid-cols-[1fr_1fr]">
+          <div class="rounded-[2rem] bg-slate-950 p-6 text-white">
+            <p class="text-sm font-black uppercase tracking-[0.24em] text-blue-300">Atomic Primitive</p>
+            <h2 class="mt-2 text-3xl font-black">Test-and-set makes acquire indivisible.</h2>
+            <pre class="mt-6 overflow-x-auto rounded-2xl bg-black/40 p-5 text-sm text-slate-200"><code>while (TestAndSet(lock, 1) == 1) {
+  ; // spin
+}
+
+// only the winner enters
+critical_section();
+*lock = 0;</code></pre>
+            <p class="mt-5 text-sm leading-6 text-slate-300">The thread that changes the lock from 0 to 1 owns the critical section. Others repeatedly observe 1 and wait.</p>
+          </div>
+          <div class="rounded-[2rem] bg-slate-50 p-6 ring-1 ring-slate-200">
+            <p class="text-sm font-black uppercase tracking-[0.24em] text-violet-700">CAS</p>
+            <h2 class="mt-2 text-3xl font-black">Compare-and-swap is conditional.</h2>
+            <p class="mt-4 text-lg leading-8 text-slate-600">Test-and-set blindly writes. Compare-and-swap writes only if the current value equals the expected value, making it more general for lock-free algorithms too.</p>
+            <div class="mt-6 grid grid-cols-3 overflow-hidden rounded-2xl text-center text-sm font-black ring-1 ring-slate-200">
+              <div class="bg-slate-900 px-3 py-4 text-white">actual</div>
+              <div class="bg-violet-200 px-3 py-4 text-violet-950">expected?</div>
+              <div class="bg-emerald-200 px-3 py-4 text-emerald-950">maybe write</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="bg-slate-100 text-ink">
+      <div class="mx-auto max-w-7xl px-5 py-16 sm:px-8">
+        <div class="mb-8 max-w-3xl">
+          <p class="text-sm font-black uppercase tracking-[0.24em] text-emerald-700">Fairness</p>
+          <h2 class="mt-2 text-3xl font-black tracking-tight sm:text-5xl">Ticket locks turn lock acquisition into a line.</h2>
+        </div>
+        <div class="grid gap-8 lg:grid-cols-[0.95fr_1.05fr]">
+          <div class="rounded-3xl bg-white p-6 ring-1 ring-slate-200">
+            <div class="flex items-center justify-between gap-3">
+              <h3 class="text-xl font-black">Ticket Lock Simulator</h3>
+              <button id="nextTurn" class="rounded-full bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-500">Unlock next</button>
+            </div>
+            <div class="mt-6 grid grid-cols-2 gap-4">
+              <div class="rounded-2xl bg-slate-950 p-5 text-white"><p class="text-sm font-bold text-slate-400">ticket</p><p id="ticketVal" class="mt-2 text-4xl font-black text-amber-300">4</p></div>
+              <div class="rounded-2xl bg-slate-950 p-5 text-white"><p class="text-sm font-bold text-slate-400">turn</p><p id="turnVal" class="mt-2 text-4xl font-black text-emerald-300">0</p></div>
+            </div>
+            <div id="ticketLine" class="mt-6 grid gap-3"></div>
+          </div>
+          <div class="rounded-3xl bg-white p-6 ring-1 ring-slate-200">
+            <h3 class="text-xl font-black">Spin vs Queue</h3>
+            <div class="mt-5 grid gap-4 sm:grid-cols-2">
+              <div class="rounded-2xl bg-rose-50 p-5 ring-1 ring-rose-100"><h4 class="font-black text-rose-800">Spin lock</h4><p class="mt-2 text-sm leading-6 text-slate-600">Good if waits are very short. Bad if a thread burns CPU for a long wait.</p><div class="mt-4 h-4 rounded-full bg-rose-200"><div class="h-4 w-4/5 rounded-full bg-rose-500"></div></div><p class="mt-2 text-xs font-bold text-rose-700">CPU wasted while waiting</p></div>
+              <div class="rounded-2xl bg-emerald-50 p-5 ring-1 ring-emerald-100"><h4 class="font-black text-emerald-800">Queue lock</h4><p class="mt-2 text-sm leading-6 text-slate-600">Good for longer waits. OS parks blocked threads and wakes one later.</p><div class="mt-4 h-4 rounded-full bg-emerald-200"><div class="h-4 w-1/4 rounded-full bg-emerald-500"></div></div><p class="mt-2 text-xs font-bold text-emerald-700">CPU saved while waiting</p></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const raceToggle = document.getElementById('raceToggle');
+    const runRace = document.getElementById('runRace');
+    const raceMode = document.getElementById('raceMode');
+    const threadA = document.getElementById('threadA');
+    const threadB = document.getElementById('threadB');
+    const counterOut = document.getElementById('counterOut');
+    const counterExplain = document.getElementById('counterExplain');
+    const timeline = document.getElementById('timeline');
+    const ticketLine = document.getElementById('ticketLine');
+    const ticketVal = document.getElementById('ticketVal');
+    const turnVal = document.getElementById('turnVal');
+    const nextTurn = document.getElementById('nextTurn');
+
+    let locked = false;
+    let turn = 0;
+    const tickets = ['T0', 'T1', 'T2', 'T3'];
+
+    function renderRace() {
+      const steps = locked
+        ? ['A acquires lock', 'A reads 0', 'A writes 1', 'A releases lock', 'B acquires lock', 'B reads 1', 'B writes 2']
+        : ['A reads 0', 'B reads 0', 'A writes 1', 'B writes 1'];
+      timeline.innerHTML = '';
+      steps.forEach((step, index) => {
+        const item = document.createElement('div');
+        item.className = 'rounded-2xl bg-white/10 p-4 text-sm font-bold text-slate-200';
+        item.textContent = `${index + 1}. ${step}`;
+        timeline.appendChild(item);
+      });
+      threadA.textContent = locked ? 'holds lock, increments, releases' : 'read 0, later wrote 1';
+      threadB.textContent = locked ? 'waits, then increments after A' : 'read 0, later wrote 1';
+      counterOut.textContent = locked ? '2' : '1';
+      counterExplain.textContent = locked ? 'Correct: the critical section was serialized.' : 'Lost update: both threads read 0, both write 1.';
+    }
+
+    function renderTicketLine() {
+      ticketLine.innerHTML = '';
+      ticketVal.textContent = tickets.length;
+      turnVal.textContent = turn;
+      tickets.forEach((name, ticket) => {
+        const item = document.createElement('div');
+        const active = ticket === turn;
+        item.className = `rounded-2xl p-4 font-bold ring-1 ${active ? 'bg-emerald-100 text-emerald-900 ring-emerald-300' : ticket < turn ? 'bg-slate-100 text-slate-500 ring-slate-200' : 'bg-amber-50 text-amber-900 ring-amber-200'}`;
+        item.textContent = active ? `${name}: ticket ${ticket}, inside critical section` : ticket < turn ? `${name}: ticket ${ticket}, finished` : `${name}: ticket ${ticket}, spinning until turn == ${ticket}`;
+        ticketLine.appendChild(item);
+      });
+    }
+
+    raceToggle.addEventListener('click', () => {
+      locked = !locked;
+      raceToggle.textContent = locked ? 'Disable Lock' : 'Enable Lock';
+      raceMode.textContent = locked ? 'Locked: only one thread may enter the critical section at a time.' : 'Unlocked: both threads can enter the critical section together.';
+      raceMode.className = locked ? 'mt-4 rounded-2xl bg-emerald-100 p-4 text-sm font-bold text-emerald-800' : 'mt-4 rounded-2xl bg-rose-100 p-4 text-sm font-bold text-rose-800';
+      renderRace();
+    });
+    runRace.addEventListener('click', renderRace);
+    nextTurn.addEventListener('click', () => {
+      turn = (turn + 1) % tickets.length;
+      renderTicketLine();
+    });
+
+    renderRace();
+    renderTicketLine();
+  </script>
+</body>
+</html>

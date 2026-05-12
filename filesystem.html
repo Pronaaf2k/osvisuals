@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Operating Systems: File System Visualized</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { theme: { extend: { colors: { ink: '#111827' }, boxShadow: { glow: '0 0 45px rgba(251, 146, 60, 0.22)' } } } };
+  </script>
+</head>
+<body class="bg-slate-950 text-white antialiased">
+  <a href="index.html" class="fixed left-4 top-4 z-50 rounded-full border border-white/15 bg-slate-950/80 px-4 py-2 text-sm font-bold text-white backdrop-blur hover:bg-slate-800">← Topics</a>
+
+  <main>
+    <section class="relative overflow-hidden border-b border-white/10">
+      <div class="absolute inset-0 bg-[radial-gradient(circle_at_18%_8%,rgba(251,146,60,0.26),transparent_34%),radial-gradient(circle_at_86%_20%,rgba(14,165,233,0.18),transparent_32%)]"></div>
+      <div class="relative mx-auto max-w-7xl px-5 py-16 sm:px-8 lg:py-24">
+        <div class="grid gap-10 lg:grid-cols-[1fr_1fr] lg:items-center">
+          <div>
+            <p class="mb-4 inline-flex rounded-full border border-orange-300/30 bg-orange-300/10 px-4 py-1 text-sm font-semibold text-orange-100">Persistence: File System</p>
+            <h1 class="text-4xl font-black tracking-tight sm:text-6xl">A file system turns raw blocks into named persistent files.</h1>
+            <p class="mt-6 max-w-2xl text-lg leading-8 text-slate-300">Storage hardware gives persistent blocks. The file system adds names, directories, metadata, inodes, allocation, file descriptors, links, and deletion semantics.</p>
+            <div class="mt-8 flex flex-wrap gap-3">
+              <a href="#layout" class="rounded-full bg-orange-300 px-5 py-3 text-sm font-bold text-slate-950 shadow-glow hover:bg-orange-200">See Disk Layout</a>
+              <a href="#path" class="rounded-full border border-white/15 px-5 py-3 text-sm font-bold text-white hover:bg-white/10">Trace a Path</a>
+            </div>
+          </div>
+          <div class="rounded-[2rem] border border-white/10 bg-white/10 p-5 shadow-glow backdrop-blur">
+            <div class="rounded-[1.5rem] bg-slate-900 p-6">
+              <h2 class="text-xl font-black">Three ways to identify a file</h2>
+              <div class="mt-5 grid gap-4 sm:grid-cols-3">
+                <div class="rounded-2xl bg-white/10 p-4"><p class="font-black text-orange-200">Name</p><p class="mt-2 text-sm text-slate-300">Human path like /home/a.txt.</p></div>
+                <div class="rounded-2xl bg-white/10 p-4"><p class="font-black text-cyan-200">Inode + device</p><p class="mt-2 text-sm text-slate-300">Persistent identity on disk.</p></div>
+                <div class="rounded-2xl bg-white/10 p-4"><p class="font-black text-emerald-200">File descriptor</p><p class="mt-2 text-sm text-slate-300">Per-process handle with offset.</p></div>
+              </div>
+              <div class="mt-6 rounded-2xl bg-slate-950 p-5 text-sm leading-6 text-slate-300">Opening a pathname does the expensive lookup once, then the process uses a small integer file descriptor for later read, write, seek, and close calls.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="bg-white text-ink">
+      <div class="mx-auto max-w-7xl px-5 py-16 sm:px-8">
+        <div class="mb-8 max-w-3xl">
+          <p class="text-sm font-black uppercase tracking-[0.24em] text-orange-700">I/O Hierarchy</p>
+          <h2 class="mt-2 text-3xl font-black tracking-tight sm:text-5xl">Each layer adds meaning over raw disk hardware.</h2>
+        </div>
+        <div class="grid gap-4 md:grid-cols-5">
+          <div class="rounded-3xl bg-blue-50 p-5 text-center ring-1 ring-blue-100"><p class="font-black text-blue-800">File Naming</p><p class="mt-2 text-sm text-slate-600">Path syntax and encoding.</p></div>
+          <div class="rounded-3xl bg-orange-50 p-5 text-center ring-1 ring-orange-100"><p class="font-black text-orange-800">Directory Access</p><p class="mt-2 text-sm text-slate-600">Map names to file objects.</p></div>
+          <div class="rounded-3xl bg-rose-50 p-5 text-center ring-1 ring-rose-100"><p class="font-black text-rose-800">File Access</p><p class="mt-2 text-sm text-slate-600">Create, read, write, seek.</p></div>
+          <div class="rounded-3xl bg-teal-50 p-5 text-center ring-1 ring-teal-100"><p class="font-black text-teal-800">Device Driver</p><p class="mt-2 text-sm text-slate-600">Talk to storage device.</p></div>
+          <div class="rounded-3xl bg-slate-100 p-5 text-center ring-1 ring-slate-200"><p class="font-black text-slate-800">Disk Hardware</p><p class="mt-2 text-sm text-slate-600">Persistent blocks.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="layout" class="bg-slate-100 text-ink">
+      <div class="mx-auto max-w-7xl px-5 py-16 sm:px-8">
+        <div class="mb-8 max-w-3xl">
+          <p class="text-sm font-black uppercase tracking-[0.24em] text-orange-700">On-Disk Organization</p>
+          <h2 class="mt-2 text-3xl font-black tracking-tight sm:text-5xl">A filesystem is metadata plus data blocks.</h2>
+        </div>
+        <div class="rounded-[2rem] bg-white p-6 shadow-xl ring-1 ring-slate-200">
+          <div class="grid grid-cols-16 gap-1 text-center text-xs font-black text-slate-950" id="diskBlocks"></div>
+          <div class="mt-6 grid gap-4 md:grid-cols-5">
+            <div class="rounded-2xl bg-indigo-50 p-4 ring-1 ring-indigo-100"><p class="font-black text-indigo-800">Superblock</p><p class="mt-2 text-sm text-slate-600">Master layout and global metadata.</p></div>
+            <div class="rounded-2xl bg-cyan-50 p-4 ring-1 ring-cyan-100"><p class="font-black text-cyan-800">Bitmaps</p><p class="mt-2 text-sm text-slate-600">Track free inodes and data blocks.</p></div>
+            <div class="rounded-2xl bg-emerald-50 p-4 ring-1 ring-emerald-100"><p class="font-black text-emerald-800">Inodes</p><p class="mt-2 text-sm text-slate-600">Metadata and block pointers.</p></div>
+            <div class="rounded-2xl bg-orange-50 p-4 ring-1 ring-orange-100"><p class="font-black text-orange-800">Data blocks</p><p class="mt-2 text-sm text-slate-600">File contents and directory records.</p></div>
+            <div class="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200"><p class="font-black text-slate-800">Free blocks</p><p class="mt-2 text-sm text-slate-600">Available for future allocation.</p></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="bg-white text-ink">
+      <div class="mx-auto max-w-7xl px-5 py-16 sm:px-8">
+        <div class="grid gap-8 lg:grid-cols-[0.95fr_1.05fr]">
+          <div class="rounded-[2rem] bg-slate-950 p-6 text-white">
+            <p class="text-sm font-black uppercase tracking-[0.24em] text-orange-300">Inodes</p>
+            <h2 class="mt-2 text-3xl font-black">An inode stores metadata, not the filename.</h2>
+            <div class="mt-6 grid gap-3">
+              <div class="rounded-2xl bg-white/10 p-4"><strong>Metadata:</strong> size, owner, permissions, timestamps, link count.</div>
+              <div class="rounded-2xl bg-white/10 p-4"><strong>Location:</strong> direct block pointers and indirect pointer blocks.</div>
+              <div class="rounded-2xl bg-white/10 p-4"><strong>Directory entry:</strong> filename maps to inode number.</div>
+            </div>
+          </div>
+          <div class="rounded-[2rem] bg-slate-50 p-6 ring-1 ring-slate-200">
+            <p class="text-sm font-black uppercase tracking-[0.24em] text-cyan-700">Multi-Level Index</p>
+            <h2 class="mt-2 text-3xl font-black">Small files are cheap. Large files grow through indirection.</h2>
+            <div class="mt-6 space-y-4">
+              <div class="rounded-2xl bg-white p-4 ring-1 ring-slate-200"><strong>Direct pointers:</strong> first few data blocks are immediately reachable.</div>
+              <div class="rounded-2xl bg-white p-4 ring-1 ring-slate-200"><strong>Single indirect:</strong> points to a block full of data-block pointers.</div>
+              <div class="rounded-2xl bg-white p-4 ring-1 ring-slate-200"><strong>Double/triple indirect:</strong> expands capacity to gigabytes or terabytes with 4 KiB blocks.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="path" class="bg-slate-100 text-ink">
+      <div class="mx-auto max-w-7xl px-5 py-16 sm:px-8">
+        <div class="mb-8 max-w-3xl">
+          <p class="text-sm font-black uppercase tracking-[0.24em] text-blue-700">Pathname Lookup</p>
+          <h2 class="mt-2 text-3xl font-black tracking-tight sm:text-5xl">Opening a file walks directories until it finds the final inode.</h2>
+        </div>
+        <div class="grid gap-8 lg:grid-cols-[0.9fr_1.1fr]">
+          <div class="rounded-3xl bg-white p-6 ring-1 ring-slate-200">
+            <div class="flex items-center justify-between gap-3">
+              <h3 class="text-xl font-black">Trace /home/nsu/os.txt</h3>
+              <button id="pathStep" class="rounded-full bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-500">Next Step</button>
+            </div>
+            <div id="pathTrace" class="mt-6 grid gap-3"></div>
+          </div>
+          <div class="rounded-3xl bg-slate-950 p-6 text-white shadow-xl">
+            <h3 class="text-xl font-black">Directory Records</h3>
+            <div class="mt-5 grid gap-3">
+              <div class="rounded-2xl bg-white/10 p-4 font-mono">/ → inode 2</div>
+              <div class="rounded-2xl bg-white/10 p-4 font-mono">home → inode 18</div>
+              <div class="rounded-2xl bg-white/10 p-4 font-mono">nsu → inode 44</div>
+              <div class="rounded-2xl bg-orange-300 p-4 font-mono font-black text-orange-950">os.txt → inode 91</div>
+            </div>
+            <p class="mt-5 text-sm leading-6 text-slate-300">A directory is itself a file whose data maps names to inode numbers.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="bg-white text-ink">
+      <div class="mx-auto max-w-7xl px-5 py-16 sm:px-8">
+        <div class="grid gap-8 lg:grid-cols-[1fr_1fr]">
+          <div class="rounded-[2rem] bg-slate-950 p-6 text-white">
+            <p class="text-sm font-black uppercase tracking-[0.24em] text-emerald-300">File Descriptors</p>
+            <h2 class="mt-2 text-3xl font-black">A descriptor is a process-local handle.</h2>
+            <div class="mt-6 grid grid-cols-[4rem_1fr] overflow-hidden rounded-2xl border border-white/10 text-sm">
+              <div class="bg-white/10 p-3 font-black">fd 0</div><div class="p-3 text-slate-400">stdin</div>
+              <div class="bg-white/10 p-3 font-black">fd 1</div><div class="p-3 text-slate-400">stdout</div>
+              <div class="bg-white/10 p-3 font-black">fd 2</div><div class="p-3 text-slate-400">stderr</div>
+              <div class="bg-emerald-300 p-3 font-black text-emerald-950">fd 3</div><div class="bg-emerald-300/20 p-3 font-mono">offset=23, inode=91, device=Y</div>
+              <div class="bg-cyan-300 p-3 font-black text-cyan-950">fd 4</div><div class="bg-cyan-300/20 p-3 font-mono">offset=0, inode=91, device=Y</div>
+              <div class="bg-cyan-300 p-3 font-black text-cyan-950">fd 5</div><div class="bg-cyan-300/20 p-3 font-mono">dup(fd4): shares open file entry</div>
+            </div>
+          </div>
+          <div class="rounded-[2rem] bg-slate-50 p-6 ring-1 ring-slate-200">
+            <p class="text-sm font-black uppercase tracking-[0.24em] text-rose-700">Deletion and Links</p>
+            <h2 class="mt-2 text-3xl font-black">There is no delete syscall, only unlink.</h2>
+            <div class="mt-6 grid gap-4">
+              <div class="rounded-2xl bg-white p-4 ring-1 ring-slate-200"><strong>unlink:</strong> removes a directory entry and decrements inode reference count.</div>
+              <div class="rounded-2xl bg-white p-4 ring-1 ring-slate-200"><strong>Hard link:</strong> another directory entry pointing to the same inode.</div>
+              <div class="rounded-2xl bg-white p-4 ring-1 ring-slate-200"><strong>Soft link:</strong> a file containing another pathname; can become dangling.</div>
+              <div class="rounded-2xl bg-white p-4 ring-1 ring-slate-200"><strong>Actual free:</strong> inode/data blocks are freed only when no directory refs and no open descriptors remain.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const diskBlocks = document.getElementById('diskBlocks');
+    const blockTypes = [
+      ['S', 'bg-indigo-300'], ['ib', 'bg-cyan-300'], ['db', 'bg-cyan-300'], ['I', 'bg-emerald-300'], ['I', 'bg-emerald-300'], ['I', 'bg-emerald-300'],
+      ['D', 'bg-orange-300'], ['D', 'bg-orange-300'], ['D', 'bg-orange-300'], ['free', 'bg-slate-200'], ['D', 'bg-orange-300'], ['D', 'bg-orange-300'],
+      ['free', 'bg-slate-200'], ['D', 'bg-orange-300'], ['free', 'bg-slate-200'], ['D', 'bg-orange-300'], ['D', 'bg-orange-300'], ['D', 'bg-orange-300'], ['free', 'bg-slate-200'], ['D', 'bg-orange-300'], ['D', 'bg-orange-300'], ['free', 'bg-slate-200'], ['D', 'bg-orange-300'], ['D', 'bg-orange-300']
+    ];
+    blockTypes.forEach(([label, cls], index) => {
+      const block = document.createElement('div');
+      block.className = `rounded-lg ${cls} px-2 py-4 font-black`;
+      block.textContent = label;
+      block.title = `block ${index}`;
+      diskBlocks.appendChild(block);
+    });
+
+    const pathSteps = [
+      'Start at root directory inode 2.',
+      'Read root directory data blocks and find name home → inode 18.',
+      'Read inode 18 as a directory and find name nsu → inode 44.',
+      'Read inode 44 as a directory and find name os.txt → inode 91.',
+      'Open file inode 91 and create a file descriptor in the process table.'
+    ];
+    let pathIndex = 0;
+    const pathTrace = document.getElementById('pathTrace');
+    const pathStep = document.getElementById('pathStep');
+
+    function renderPath() {
+      pathTrace.innerHTML = '';
+      pathSteps.forEach((step, index) => {
+        const item = document.createElement('div');
+        item.className = `rounded-2xl p-4 text-sm font-bold ring-1 ${index <= pathIndex ? 'bg-blue-50 text-blue-950 ring-blue-200' : 'bg-slate-50 text-slate-500 ring-slate-200'}`;
+        item.textContent = `${index + 1}. ${step}`;
+        pathTrace.appendChild(item);
+      });
+    }
+
+    pathStep.addEventListener('click', () => {
+      pathIndex = (pathIndex + 1) % pathSteps.length;
+      renderPath();
+    });
+    renderPath();
+  </script>
+</body>
+</html>

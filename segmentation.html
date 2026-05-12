@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Virtual Memory: Segmentation Visualized</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            ink: '#111827',
+            paper: '#f8fafc',
+            violetInk: '#312e81',
+            cyanInk: '#0e7490'
+          },
+          boxShadow: {
+            glow: '0 0 40px rgba(99, 102, 241, 0.22)'
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    .memory-tick::before {
+      content: '';
+      position: absolute;
+      left: -0.75rem;
+      top: 0;
+      width: 0.5rem;
+      border-top: 1px solid rgb(148 163 184);
+    }
+
+    .segment-block {
+      transition: transform 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
+    }
+
+    .segment-block:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 16px 35px rgba(15, 23, 42, 0.16);
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 antialiased">
+  <main>
+    <a href="index.html" class="fixed left-4 top-4 z-50 rounded-full border border-white/15 bg-slate-950/80 px-4 py-2 text-sm font-bold text-white backdrop-blur hover:bg-slate-800">← Topics</a>
+    <section class="relative overflow-hidden border-b border-white/10">
+      <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.18),transparent_36%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.22),transparent_34%)]"></div>
+      <div class="relative mx-auto max-w-7xl px-5 py-16 sm:px-8 lg:py-24">
+        <div class="grid gap-10 lg:grid-cols-[1.02fr_0.98fr] lg:items-center">
+          <div>
+            <p class="mb-4 inline-flex rounded-full border border-cyan-300/30 bg-cyan-300/10 px-4 py-1 text-sm font-semibold text-cyan-100">CSE 323: Virtual Memory</p>
+            <h1 class="text-4xl font-black tracking-tight text-white sm:text-6xl">Segmentation turns one process into movable memory regions.</h1>
+            <p class="mt-6 max-w-2xl text-lg leading-8 text-slate-300">The OS gives each process the illusion of a private address space. The MMU makes that illusion real by translating virtual addresses into physical addresses and blocking illegal accesses.</p>
+            <div class="mt-8 flex flex-wrap gap-3">
+              <a href="#translation" class="rounded-full bg-cyan-300 px-5 py-3 text-sm font-bold text-slate-950 shadow-glow hover:bg-cyan-200">Try Address Translation</a>
+              <a href="#segmentation" class="rounded-full border border-white/15 px-5 py-3 text-sm font-bold text-white hover:bg-white/10">See Segments</a>
+            </div>
+          </div>
+          <div class="rounded-[2rem] border border-white/10 bg-white/10 p-5 shadow-glow backdrop-blur">
+            <div class="rounded-[1.5rem] bg-slate-900 p-5">
+              <div class="mb-4 flex items-center justify-between">
+                <span class="text-sm font-bold uppercase tracking-[0.24em] text-slate-400">Problem</span>
+                <span class="rounded-full bg-rose-400/15 px-3 py-1 text-xs font-bold text-rose-200">No isolation</span>
+              </div>
+              <div class="grid grid-cols-[5rem_1fr] gap-4">
+                <div class="space-y-10 pt-1 text-right text-xs font-semibold text-slate-400">
+                  <p>0 KiB</p><p>16 KiB</p><p>32 KiB</p><p>48 KiB</p><p>64 KiB</p>
+                </div>
+                <div class="overflow-hidden rounded-2xl border border-slate-600 bg-slate-800">
+                  <div class="h-16 bg-slate-500/80 p-3 text-sm font-bold">Operating System</div>
+                  <div class="h-10 bg-slate-700/70 p-2 text-xs text-slate-300">free</div>
+                  <div class="h-20 bg-emerald-400 p-3 text-center font-black text-emerald-950">Process A</div>
+                  <div class="h-16 bg-violet-400 p-3 text-center font-black text-violet-950">Process B</div>
+                  <div class="h-10 bg-slate-700/70 p-2 text-xs text-slate-300">free</div>
+                  <div class="h-16 bg-amber-300 p-3 text-center font-black text-amber-950">Process C</div>
+                </div>
+              </div>
+              <p class="mt-5 rounded-2xl bg-slate-800 p-4 text-sm leading-6 text-slate-300">If processes share physical memory directly, one bad pointer can read or overwrite another process. Segmentation adds hardware checks between every program address and real memory.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="bg-paper text-ink">
+      <div class="mx-auto max-w-7xl px-5 py-14 sm:px-8">
+        <div class="grid gap-4 md:grid-cols-4">
+          <article class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+            <p class="text-sm font-black uppercase tracking-widest text-cyanInk">Goal</p>
+            <h2 class="mt-2 text-xl font-black">Transparency</h2>
+            <p class="mt-3 text-sm leading-6 text-slate-600">Each process behaves as if it owns memory.</p>
+          </article>
+          <article class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+            <p class="text-sm font-black uppercase tracking-widest text-cyanInk">Policy</p>
+            <h2 class="mt-2 text-xl font-black">Protection</h2>
+            <p class="mt-3 text-sm leading-6 text-slate-600">Other processes and the OS must be isolated.</p>
+          </article>
+          <article class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+            <p class="text-sm font-black uppercase tracking-widest text-cyanInk">Mechanism</p>
+            <h2 class="mt-2 text-xl font-black">Translation</h2>
+            <p class="mt-3 text-sm leading-6 text-slate-600">The MMU maps virtual addresses to physical addresses.</p>
+          </article>
+          <article class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+            <p class="text-sm font-black uppercase tracking-widest text-cyanInk">Efficiency</p>
+            <h2 class="mt-2 text-xl font-black">Hardware Fast Path</h2>
+            <p class="mt-3 text-sm leading-6 text-slate-600">Checks happen on every access, so they must be cheap.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="translation" class="bg-white text-ink">
+      <div class="mx-auto max-w-7xl px-5 py-16 sm:px-8">
+        <div class="mb-8 max-w-3xl">
+          <p class="text-sm font-black uppercase tracking-[0.24em] text-violetInk">Interactive Model</p>
+          <h2 class="mt-2 text-3xl font-black tracking-tight sm:text-5xl">Base-only translation is fast, but unsafe.</h2>
+          <p class="mt-4 text-lg leading-8 text-slate-600">A base register simply adds an offset: physical address = base + virtual address. Without a bounds check, a process can create a large virtual address and walk into another process.</p>
+        </div>
+
+        <div class="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
+          <div class="rounded-3xl bg-slate-50 p-6 ring-1 ring-slate-200">
+            <label for="va" class="text-sm font-black uppercase tracking-widest text-slate-500">Virtual address</label>
+            <div class="mt-4 flex items-center gap-4">
+              <input id="va" type="range" min="0" max="16384" step="256" value="256" class="w-full accent-cyan-600" />
+              <output id="vaOut" class="w-28 rounded-xl bg-slate-900 px-3 py-2 text-center font-mono text-sm font-bold text-cyan-200">0x0100</output>
+            </div>
+
+            <div class="mt-6 grid gap-4 sm:grid-cols-2">
+              <div class="rounded-2xl bg-white p-4 ring-1 ring-slate-200">
+                <p class="text-xs font-black uppercase tracking-widest text-slate-500">Base</p>
+                <p class="mt-2 font-mono text-2xl font-black text-slate-950">0x1000</p>
+                <p class="mt-1 text-sm text-slate-500">P1 starts at 4 KiB physical memory.</p>
+              </div>
+              <div class="rounded-2xl bg-white p-4 ring-1 ring-slate-200">
+                <p class="text-xs font-black uppercase tracking-widest text-slate-500">Bounds</p>
+                <p class="mt-2 font-mono text-2xl font-black text-slate-950">0x1000</p>
+                <p class="mt-1 text-sm text-slate-500">P1 owns only 4 KiB.</p>
+              </div>
+            </div>
+
+            <div class="mt-6 rounded-2xl bg-slate-900 p-5 text-white">
+              <p class="text-sm font-bold text-slate-400">MMU result</p>
+              <p class="mt-2 font-mono text-xl font-black"><span id="formula">0x1000 + 0x0100 = 0x1100</span></p>
+              <p id="accessResult" class="mt-3 rounded-xl bg-emerald-400/15 px-4 py-3 text-sm font-bold text-emerald-200">Allowed: virtual address is inside bounds.</p>
+            </div>
+          </div>
+
+          <div class="rounded-3xl bg-slate-950 p-6 text-white shadow-xl">
+            <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+              <h3 class="text-xl font-black">Physical Memory View</h3>
+              <span id="modeBadge" class="rounded-full bg-emerald-400 px-3 py-1 text-xs font-black text-emerald-950">SAFE</span>
+            </div>
+            <div class="grid grid-cols-[4.5rem_1fr] gap-4">
+              <div class="relative space-y-[2.78rem] pt-1 text-right text-xs font-bold text-slate-400">
+                <p>0 KiB</p><p>4 KiB</p><p>8 KiB</p><p>12 KiB</p><p>16 KiB</p><p>20 KiB</p>
+              </div>
+              <div class="relative h-[26rem] overflow-hidden rounded-2xl border border-slate-600 bg-slate-800">
+                <div class="absolute inset-x-0 top-0 h-[20%] bg-slate-700 p-3 text-sm font-bold text-slate-300">OS / reserved</div>
+                <div class="absolute inset-x-0 top-[20%] h-[20%] bg-cyan-400 p-3 text-center text-lg font-black text-cyan-950">P1 allowed range</div>
+                <div class="absolute inset-x-0 top-[40%] h-[20%] bg-slate-700 p-3 text-sm font-bold text-slate-300">free / other</div>
+                <div class="absolute inset-x-0 top-[60%] h-[20%] bg-fuchsia-400 p-3 text-center text-lg font-black text-fuchsia-950">P2 memory</div>
+                <div class="absolute inset-x-0 top-[80%] h-[20%] bg-slate-700 p-3 text-sm font-bold text-slate-300">free / other</div>
+                <div id="pointer" class="absolute left-0 right-0 top-[21%] z-10 border-t-4 border-amber-300">
+                  <span class="absolute -top-4 right-3 rounded-full bg-amber-300 px-3 py-1 text-xs font-black text-amber-950">access</span>
+                </div>
+              </div>
+            </div>
+            <p class="mt-5 text-sm leading-6 text-slate-300">Move the slider past 0x1000. Base-only still computes a physical address, but base+bounds throws a segmentation fault before P1 reaches P2.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="segmentation" class="bg-slate-100 text-ink">
+      <div class="mx-auto max-w-7xl px-5 py-16 sm:px-8">
+        <div class="grid gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
+          <div>
+            <p class="text-sm font-black uppercase tracking-[0.24em] text-cyanInk">Segmentation</p>
+            <h2 class="mt-2 text-3xl font-black tracking-tight sm:text-5xl">Instead of one base and bounds pair, use one pair per region.</h2>
+            <p class="mt-4 text-lg leading-8 text-slate-600">A process is not one solid block. Code, heap, and stack have different purposes, permissions, sizes, and growth directions. Segmentation maps each logical region independently.</p>
+            <div class="mt-6 grid gap-3">
+              <div class="rounded-2xl bg-white p-4 ring-1 ring-slate-200"><strong>Code segment:</strong> read and execute; usually does not grow.</div>
+              <div class="rounded-2xl bg-white p-4 ring-1 ring-slate-200"><strong>Heap segment:</strong> read and write; grows upward as malloc needs space.</div>
+              <div class="rounded-2xl bg-white p-4 ring-1 ring-slate-200"><strong>Stack segment:</strong> read and write; grows downward as calls allocate frames.</div>
+            </div>
+          </div>
+
+          <div class="rounded-[2rem] bg-white p-6 shadow-xl ring-1 ring-slate-200">
+            <div class="mb-5 flex items-center justify-between gap-4">
+              <h3 class="text-xl font-black">Segment Table</h3>
+              <span class="rounded-full bg-violet-100 px-3 py-1 text-xs font-black text-violetInk">VA = segment + offset</span>
+            </div>
+            <div class="overflow-hidden rounded-2xl ring-1 ring-slate-200">
+              <table class="w-full text-left text-sm">
+                <thead class="bg-slate-950 text-white">
+                  <tr><th class="px-4 py-3">Segment</th><th class="px-4 py-3">Base</th><th class="px-4 py-3">Size</th><th class="px-4 py-3">Protection</th></tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200 bg-white">
+                  <tr><td class="px-4 py-3 font-bold text-cyan-700">Code</td><td class="px-4 py-3 font-mono">32K</td><td class="px-4 py-3 font-mono">2K</td><td class="px-4 py-3">Read + Execute</td></tr>
+                  <tr><td class="px-4 py-3 font-bold text-emerald-700">Heap</td><td class="px-4 py-3 font-mono">34K</td><td class="px-4 py-3 font-mono">3K</td><td class="px-4 py-3">Read + Write</td></tr>
+                  <tr><td class="px-4 py-3 font-bold text-fuchsia-700">Stack</td><td class="px-4 py-3 font-mono">28K</td><td class="px-4 py-3 font-mono">2K</td><td class="px-4 py-3">Read + Write</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="mt-6 grid gap-5 md:grid-cols-[1fr_1.2fr]">
+              <div class="rounded-2xl bg-slate-100 p-4">
+                <p class="mb-3 text-sm font-black uppercase tracking-widest text-slate-500">Virtual address bits</p>
+                <div class="grid grid-cols-[0.8fr_2fr] overflow-hidden rounded-xl border border-slate-300 text-center font-mono text-sm font-black">
+                  <div class="bg-violet-200 px-3 py-4 text-violet-950">segment</div>
+                  <div class="bg-cyan-100 px-3 py-4 text-cyan-950">offset</div>
+                </div>
+                <p class="mt-3 text-sm leading-6 text-slate-600">The segment selects the base/bounds pair. The offset is checked against that segment's size.</p>
+              </div>
+              <div class="rounded-2xl bg-slate-950 p-4 text-white">
+                <p class="mb-3 text-sm font-black uppercase tracking-widest text-slate-400">Physical layout</p>
+                <div class="relative h-64 overflow-hidden rounded-xl border border-slate-600 bg-slate-800">
+                  <div class="absolute inset-x-0 top-0 h-[25%] bg-slate-600 p-2 text-xs font-bold">OS</div>
+                  <div class="absolute inset-x-0 top-[25%] h-[18%] bg-fuchsia-400 p-2 text-center font-black text-fuchsia-950">Stack</div>
+                  <div class="absolute inset-x-0 top-[43%] h-[8%] bg-slate-700 p-2 text-xs text-slate-300">gap</div>
+                  <div class="absolute inset-x-0 top-[51%] h-[16%] bg-cyan-300 p-2 text-center font-black text-cyan-950">Code</div>
+                  <div class="absolute inset-x-0 top-[67%] h-[24%] bg-emerald-300 p-2 text-center font-black text-emerald-950">Heap</div>
+                  <div class="absolute inset-x-0 bottom-0 h-[9%] bg-slate-700 p-2 text-xs text-slate-300">unused</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="bg-white text-ink">
+      <div class="mx-auto max-w-7xl px-5 py-16 sm:px-8">
+        <div class="mb-8 max-w-3xl">
+          <p class="text-sm font-black uppercase tracking-[0.24em] text-violetInk">Mental Model</p>
+          <h2 class="mt-2 text-3xl font-black tracking-tight sm:text-5xl">How every memory access is handled.</h2>
+        </div>
+        <div class="grid gap-4 md:grid-cols-5">
+          <div class="rounded-3xl bg-slate-950 p-5 text-white"><p class="text-3xl font-black text-cyan-300">1</p><h3 class="mt-3 font-black">CPU emits VA</h3><p class="mt-2 text-sm text-slate-300">Instruction uses a logical address.</p></div>
+          <div class="rounded-3xl bg-slate-100 p-5"><p class="text-3xl font-black text-cyan-700">2</p><h3 class="mt-3 font-black">MMU selects segment</h3><p class="mt-2 text-sm text-slate-600">Code, data, stack, or extra.</p></div>
+          <div class="rounded-3xl bg-slate-100 p-5"><p class="text-3xl font-black text-cyan-700">3</p><h3 class="mt-3 font-black">Bounds check</h3><p class="mt-2 text-sm text-slate-600">Offset must be inside segment size.</p></div>
+          <div class="rounded-3xl bg-slate-100 p-5"><p class="text-3xl font-black text-cyan-700">4</p><h3 class="mt-3 font-black">Protection check</h3><p class="mt-2 text-sm text-slate-600">Read, write, or execute must be allowed.</p></div>
+          <div class="rounded-3xl bg-emerald-100 p-5"><p class="text-3xl font-black text-emerald-700">5</p><h3 class="mt-3 font-black">Base + offset</h3><p class="mt-2 text-sm text-slate-700">Valid access reaches physical memory.</p></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const va = document.getElementById('va');
+    const vaOut = document.getElementById('vaOut');
+    const formula = document.getElementById('formula');
+    const accessResult = document.getElementById('accessResult');
+    const pointer = document.getElementById('pointer');
+    const modeBadge = document.getElementById('modeBadge');
+
+    const base = 0x1000;
+    const bounds = 0x1000;
+    const physicalMax = 0x5000;
+
+    function hex(value) {
+      return '0x' + value.toString(16).toUpperCase().padStart(4, '0');
+    }
+
+    function updateTranslation() {
+      const virtualAddress = Number(va.value);
+      const physicalAddress = base + virtualAddress;
+      const topPercent = Math.min(98, Math.max(0, (physicalAddress / physicalMax) * 100));
+      const allowed = virtualAddress < bounds;
+
+      vaOut.textContent = hex(virtualAddress);
+      formula.textContent = `${hex(base)} + ${hex(virtualAddress)} = ${hex(physicalAddress)}`;
+      pointer.style.top = `${topPercent}%`;
+
+      if (allowed) {
+        accessResult.textContent = 'Allowed: virtual address is inside bounds.';
+        accessResult.className = 'mt-3 rounded-xl bg-emerald-400/15 px-4 py-3 text-sm font-bold text-emerald-200';
+        modeBadge.textContent = 'SAFE';
+        modeBadge.className = 'rounded-full bg-emerald-400 px-3 py-1 text-xs font-black text-emerald-950';
+      } else {
+        accessResult.textContent = 'Blocked: base+bounds raises a segmentation fault before this access reaches memory.';
+        accessResult.className = 'mt-3 rounded-xl bg-rose-400/15 px-4 py-3 text-sm font-bold text-rose-200';
+        modeBadge.textContent = 'SEGFAULT';
+        modeBadge.className = 'rounded-full bg-rose-400 px-3 py-1 text-xs font-black text-rose-950';
+      }
+    }
+
+    va.addEventListener('input', updateTranslation);
+    updateTranslation();
+  </script>
+</body>
+</html>
